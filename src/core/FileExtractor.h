@@ -9,6 +9,6 @@ struct FileExtractor {
     [[nodiscard]] virtual std::string extract(const std::filesystem::path& path) const = 0;
 };
 
-std::unique_ptr<FileExtractor> createFileExtractor(const std::string& format);
+std::unique_ptr<FileExtractor> createFileExtractor(const std::string& input_format);
 
 std::unique_ptr<FileExtractor> createFileExtractor(const std::filesystem::path& path);

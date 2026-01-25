@@ -9,11 +9,7 @@ class TextParser {
     public:
     TextParser() = default;
 
-    Sentences parseFile(const std::filesystem::path& path) {
-        auto extractor = createFileExtractor(path);
-        std::string content = extractor->extract(path);
-        return _segmenter.segment(content);
-    };
+    Sentences parseFile(const std::filesystem::path& path);
 
     private:
     RegexSegmenter _segmenter;

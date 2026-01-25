@@ -66,16 +66,38 @@ add_executable(ThothTests
 )
 
 target_include_directories(ThothTests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(ThothTests PRIVATE
     ThothCore
+    GTest::gtest
     GTest::gtest_main
+    GTest::gmock
+)
+
+target_compile_definitions(ThothTests PRIVATE
+    TEST_RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/resources"
 )
 
 include(GoogleTest)
-gtest_discover_tests(ThothTests)
+include(CTest)
+
+# Discover and register tests with CTest
+gtest_discover_tests(ThothTests
+    DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST
+    PROPERTIES
+        TIMEOUT 30
+)
+
+# Add custom test target for convenience
+add_custom_target(ThothTest
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    DEPENDS ThothTests
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Running unit tests..."
+)
 
 # Target-4, Thoth Documentation
 add_custom_target(ThothDocs
