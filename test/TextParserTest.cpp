@@ -1,17 +1,23 @@
 #include <gtest/gtest.h>
 #include <core/TextParser.h>
 
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
 
 TEST(TextParserTest, HandleEmptyFile) {
     TextParser parser;
     EXPECT_THROW(parser.parseFile(""), std::invalid_argument);
 }
 
-TEST(TextParserTest, HandleValidContent) {
+TEST(TextParserTest, HandleShortTxtArticle) {
+    fs::path resource_dir = TEST_RESOURCE_DIR;
+    fs::path article_path = resource_dir / "short_article.txt";
+    
     TextParser parser;
+    auto sentences = parser.parseFile(article_path);
 
-    std::string content = "Hello, Mayday! Ashin. Ming. Monster. Masa. Stone.";
-    auto sentences = parser.parseFile(content);
-
-    EXPECT_EQ(sentences.size(), 6);
+    EXPECT_FALSE(sentences.empty());
+    EXPECT_EQ(sentences.size(), 9);
 }

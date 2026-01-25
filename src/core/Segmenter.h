@@ -16,4 +16,7 @@ std::unique_ptr<Segmenter> createRegexSegmenter();
 class RegexSegmenter : public Segmenter {
     public:
     Sentences segment(std::string_view text) const override;
+
+    private:
+    bool isValidSentence(const std::string& raw) const;
 };

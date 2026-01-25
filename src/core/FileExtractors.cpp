@@ -23,10 +23,11 @@ class PdfExtractor : public FileExtractor {
     }
 };
 
-std::unique_ptr<FileExtractor> createFileExtractor(const std::string& format) {
-    // std::transform(format.begin(), format.end(), format.begin(), [](unsigned char c){
-    //     return std::tolower(c);
-    // });
+std::unique_ptr<FileExtractor> createFileExtractor(const std::string& input_format) {
+    std::string format = input_format;
+    std::transform(format.begin(), format.end(), format.begin(), [](unsigned char c){
+        return std::tolower(c);
+    });
     
     if (format == "txt")    return std::make_unique<TxtExtractor>();
     if (format == "pdf")    return std::make_unique<PdfExtractor>();
