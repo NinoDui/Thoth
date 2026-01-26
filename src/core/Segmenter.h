@@ -1,11 +1,11 @@
-#include <vector>
-#include <string>
 #include <regex>
+#include <string>
+#include <vector>
 
 using Sentences = std::vector<std::string>;
 
 class Segmenter {
-    public:
+   public:
     virtual ~Segmenter() = default;
 
     [[nodiscard]] virtual Sentences segment(std::string_view text) const = 0;
@@ -14,9 +14,9 @@ class Segmenter {
 std::unique_ptr<Segmenter> createRegexSegmenter();
 
 class RegexSegmenter : public Segmenter {
-    public:
+   public:
     Sentences segment(std::string_view text) const override;
 
-    private:
+   private:
     bool isValidSentence(const std::string& raw) const;
 };

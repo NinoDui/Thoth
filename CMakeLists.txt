@@ -11,7 +11,7 @@ set(CMAKE_AUTOMOC ON)   # automatically scanning header files containing Qt meta
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    # avoid Unicode character encoding issues in Windows
 
 # Dependencies
-find_package(Qt6 COMPONENTS Widgets Network Multimedia REQUIRED)
+find_package(Qt6 COMPONENTS Core Widgets Network Multimedia REQUIRED)
 include(FetchContent)
 FetchContent_Declare(
     googletest
@@ -37,9 +37,12 @@ target_include_directories(ThothCore
         ${CMAKE_CURRENT_SOURCE_DIR}/src/core
 )
 
-target_link_libraries(ThothCore PRIVATE
-    Qt6::Network
-    Qt6::Multimedia
+target_link_libraries(ThothCore
+    PUBLIC
+        Qt6::Core
+    PRIVATE 
+        Qt6::Network
+        Qt6::Multimedia
 )
 
 # Target-2, ThothApp
@@ -109,3 +112,19 @@ add_custom_target(ThothDocs
 add_custom_target(ThothClean
     COMMAND rm -rf ${CMAKE_CURRENT_BINARY_DIR}
 )
+
+# Code Formatting
+find_program(CLANG_FORMAT clang-format)
+if (CLANG_FORMAT)
+    file(GLOB_RECURSE ALL_SOURCE_FILES
+        ${CMAKE_SOURCE_DIR}/src/*.cpp
+        ${CMAKE_SOURCE_DIR}/src/*.h
+        ${CMAKE_SOURCE_DIR}/include/*.h
+    )
+    add_custom_target(ThothFormat
+        COMMAND ${CLANG_FORMAT} -i -style=file ${ALL_SOURCE_FILES}
+        COMMENT "Formatting code with clang-format..."
+    )
+else()
+    message(STATUS "clang-format not found, code formatting will not be available.")
+endif()
