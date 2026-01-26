@@ -1,19 +1,20 @@
 #pragma once
-#include <QObject>
+#include <qtmetamacros.h>
+
 #include <QNetworkAccessManager>
+#include <QObject>
 #include <filesystem>
 #include <functional>
-#include <qtmetamacros.h>
 
 class TTSDownloader : public QObject {
     Q_OBJECT
-public:
+   public:
     explicit TTSDownloader(QObject* parent = nullptr);
 
-    using DownloadCallback = std::function<void(bool success, std::filesystem::path path)>;
+    using DownloadCallback = std::function<void(bool success, QByteArray data)>;
 
-    void download(const std::string& text, const std::filesystem::path& dst, DownloadCallback callback);
+    void download(const std::string& text, DownloadCallback callback);
 
-private:
+   private:
     QNetworkAccessManager* m_manager;
 };

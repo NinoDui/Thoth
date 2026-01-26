@@ -1,14 +1,14 @@
 #include <thoth/TTSDownloader.h>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QUrlQuery>
+
 #include <QFile>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QUrlQuery>
 
 TTSDownloader::TTSDownloader(QObject* parent)
-    : QObject(parent), m_manager(new QNetworkAccessManager(this)) {
-}
+    : QObject(parent), m_manager(new QNetworkAccessManager(this)) {}
 
-void TTSDownloader::download(const std::string& text, const std::filesystem::path& dst, DownloadCallback callback) {
+void TTSDownloader::download(const std::string& text, DownloadCallback callback) {
     QUrl url("https://translate.google.com/translate_tts");
     QUrlQuery query;
     query.addQueryItem("ie", "UTF-8");
@@ -20,21 +20,13 @@ void TTSDownloader::download(const std::string& text, const std::filesystem::pat
     QNetworkRequest request(url);
     QNetworkReply* reply = m_manager->get(request);
 
-    connect(reply, &QNetworkReply::finished, this, [reply, dst, callback]() {
+    connect(reply, &QNetworkReply::finished, this, [reply, callback]() {
         reply->deleteLater();
-
-        if (reply->error() != QNetworkReply::NoError) {
-            callback(false, dst);
-            return;
-        }
-
-        QFile file(QString::fromStdString(dst.string()));
-        if (file.open(QIODevice::WriteOnly)) {
-            file.write(reply->readAll());
-            file.close();
-            callback(true, dst);
+        if (reply->error() == QNetworkReply::NoError) {
+            QByteArray data = reply->readAll();
+            callback(true, std::move(data));
         } else {
-            callback(false, dst);
+            callback(false, QByteArray());
         }
     });
 }
