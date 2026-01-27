@@ -1,6 +1,6 @@
 #include <thoth/AudioCache.h>
-#include <thoth/AudioManager.h>
-#include <thoth/TTSDownloader.h>
+#include <thoth/Q_AudioManager.h>
+#include <thoth/Q_TTSDownloader.h>
 
 #include <iostream>
 

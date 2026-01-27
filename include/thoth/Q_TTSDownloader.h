@@ -9,12 +9,12 @@
 class TTSDownloader : public QObject {
     Q_OBJECT
    public:
+    explicit TTSDownloader(QNetworkAccessManager* qNetworkManager, QObject* parent = nullptr);
     explicit TTSDownloader(QObject* parent = nullptr);
 
     using DownloadCallback = std::function<void(bool success, QByteArray data)>;
-
     void download(const std::string& text, DownloadCallback callback);
 
    private:
-    QNetworkAccessManager* m_manager;
+    QNetworkAccessManager* m_qNetworkManager;
 };
