@@ -14,6 +14,7 @@ add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    # avoid Unicode char
 find_package(Qt6 COMPONENTS Core Widgets Network Multimedia REQUIRED)
 find_package(CURL REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(google_cloud_cpp_texttospeech REQUIRED)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -45,6 +46,7 @@ target_link_libraries(ThothCore
         Qt6::Core
         Qt6::Network
         CURL::libcurl
+        google-cloud-cpp::texttospeech
     PRIVATE 
         Qt6::Multimedia
 )
