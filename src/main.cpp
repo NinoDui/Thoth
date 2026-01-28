@@ -1,23 +1,9 @@
 #include <iostream>
 
-#include "core/Client.h"
-#include "core/Entity.h"
+#include "core/gcp.h"
 
 int main(int argc, char* argv[]) {
-    GoogleTTSClient ttsClient;
-
-    GoogleTTSConfig cfg;
-    cfg.loadFromFile("config/tts.json");
-
-    GoogleTTSRequest req(std::make_shared<GoogleTTSConfig>(cfg));
-    req.setText("Hello, world!");
-
-    auto result = ttsClient.execute(req);
-    const auto* ttsResult = dynamic_cast<GoogleTTSResult*>(result.get());
-
-    if (ttsResult->hasAudioData()) {
-        std::cout << "Success: " << ttsResult->getAudioData().size() << std::endl;
-    } else {
-        std::cout << "Error: no audio data, error is " << ttsResult->getErrorMessage() << std::endl;
-    }
+    GCPTextToSpeechClient ttsClient;
+    auto audioData = ttsClient.execute("Hello, world!");
+    std::cout << "Audio data size: " << audioData.size() << std::endl;
 }
