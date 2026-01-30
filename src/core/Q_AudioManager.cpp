@@ -1,11 +1,12 @@
 #include <thoth/AudioCache.h>
+#include <thoth/Logger.h>
 #include <thoth/Q_AudioManager.h>
 
 #include <iostream>
 
 #include "Q_GCPTTSDownloader.h"
 
-AudioManager::AudioManager(QObject* parent)
+Q_AudioManager::Q_AudioManager(QObject* parent)
     : QObject(parent),
       m_audioCache(std::make_unique<AudioCache>()),
       // objects below are managed by Qt, safe op using 'new'
@@ -30,11 +31,20 @@ AudioManager::AudioManager(QObject* parent)
             });
 
     connect(m_delayTimer, &QTimer::timeout, this, [this]() { play(m_curIdx); });
+
+    connect(m_player, &QMediaPlayer::errorOccurred, this,
+            [this](QMediaPlayer::Error error, const QString& errorMsg) {
+                LOG_ERROR("MediaPlayer error {}", errorMsg.toStdString());
+                LOG_INFO("Skipping to the next sencence, due to error occurred.");
+                playNext();
+            });
 }
 
-AudioManager::~AudioManager() = default;
+Q_AudioManager::~Q_AudioManager() = default;
 
-void AudioManager::play(int idx) {
+std::filesystem::path Q_AudioManager::getCacheDir() const { return m_audioCache->getCacheDir(); }
+
+void Q_AudioManager::play(int idx) {
     if (idx < 0 || idx >= m_playlist.size()) return;
 
     m_curIdx = idx;
@@ -43,16 +53,16 @@ void AudioManager::play(int idx) {
     fetchNext(idx);
 }
 
-void AudioManager::setPlaylist(const std::vector<std::string>& playlist) {
+void Q_AudioManager::setPlaylist(const std::vector<std::string>& playlist) {
     stop();
     m_playlist = playlist;
     m_curIdx = -1;
     m_downloadingIdx.clear();
 }
 
-void AudioManager::pause() { m_player->pause(); }
+void Q_AudioManager::pause() { m_player->pause(); }
 
-void AudioManager::resume() {
+void Q_AudioManager::resume() {
     if (m_player->playbackState() == QMediaPlayer::PausedState) {
         m_player->play();
     } else if (m_curIdx >= 0 && m_curIdx < m_playlist.size()) {
@@ -60,39 +70,41 @@ void AudioManager::resume() {
     }
 }
 
-void AudioManager::stop() {
+void Q_AudioManager::stop() {
     m_player->stop();
     m_delayTimer->stop();
 }
 
-bool AudioManager::isPlaying() const {
+bool Q_AudioManager::isPlaying() const {
     return m_player->playbackState() == QMediaPlayer::PlayingState;
 }
 
-void AudioManager::playNext() {
+void Q_AudioManager::playNext() {
+    m_player->stop();
     if (m_curIdx >= 0 && m_curIdx < m_playlist.size() - 1) {
         play(m_curIdx + 1);
         emit currentSentenceChange(m_curIdx + 1);
     }
 }
 
-void AudioManager::playPrevious() {
+void Q_AudioManager::playPrevious() {
+    m_player->stop();
     if (m_curIdx > 0) {
         play(m_curIdx - 1);
         emit currentSentenceChange(m_curIdx - 1);
     }
 }
 
-void AudioManager::setLoopSingle(bool enable, int delaySeconds) {
+void Q_AudioManager::setLoopSingle(bool enable, int delaySeconds) {
     m_singleLoop = enable;
     m_loopDelaySeconds = delaySeconds;
 }
 
-void AudioManager::exportAudioToOne(const std::filesystem::path& dstPath) const {
+void Q_AudioManager::exportAudioToOne(const std::filesystem::path& dstPath) const {
     m_audioCache->exportAudioToOne(dstPath);
 }
 
-void AudioManager::prepareAndPlay(int idx) {
+void Q_AudioManager::prepareAndPlay(int idx) {
     auto localPath = m_audioCache->get(idx);
     // hit the cache, ready for play
     if (localPath) {
@@ -125,7 +137,7 @@ void AudioManager::prepareAndPlay(int idx) {
     });
 }
 
-void AudioManager::fetchNext(int start_idx, int window_size) {
+void Q_AudioManager::fetchNext(int start_idx, int window_size) {
     for (int i = 1; start_idx + i < m_playlist.size() && i <= window_size; ++i) {
         int next_idx = start_idx + i;
 
@@ -141,3 +153,40 @@ void AudioManager::fetchNext(int start_idx, int window_size) {
         }
     }
 }
+
+std::string playbackStateToString(QMediaPlayer::PlaybackState state) {
+    switch (state) {
+        case QMediaPlayer::PlayingState:
+            return "Playing";
+        case QMediaPlayer::PausedState:
+            return "Paused";
+        case QMediaPlayer::StoppedState:
+            return "Stopped";
+        default:
+            return "Unknown";
+    }
+};
+
+std::ostream& operator<<(std::ostream& os, const Q_AudioManager& audioManager) {
+    os << "AudioManagerState: {"
+       << "Index: " << audioManager.m_curIdx << "/" << audioManager.m_playlist.size() << ", "
+       << "State: " << playbackStateToString(audioManager.m_player->playbackState()) << ", "
+       << "LoopSingle: " << (audioManager.m_singleLoop ? "Yes" : "No") << ", "
+       << "LoopDelay: " << audioManager.m_loopDelaySeconds << "s, "
+       << "Downloading: " << audioManager.m_downloadingIdx.size() << ", "
+       << "CacheDir: " << audioManager.m_audioCache->getCacheDir().string() << "}" << std::endl;
+    return os;
+}
+
+QDebug operator<<(QDebug dbg, const Q_AudioManager& audioManager) {
+    dbg.nospace() << "AudioManagerState: {"
+                  << "Index: " << audioManager.m_curIdx << "/" << audioManager.m_playlist.size()
+                  << ", "
+                  << "State: " << audioManager.m_player->playbackState() << ", "
+                  << "LoopSingle: " << (audioManager.m_singleLoop ? "Yes" : "No") << ", "
+                  << "LoopDelay: " << audioManager.m_loopDelaySeconds << "s"
+                  << "Downloading: " << audioManager.m_downloadingIdx.size() << ", ";
+    return dbg;
+}
+
+void Q_AudioManager::dumpState() const { LOG_INFO("Current Status: {}", *this); }

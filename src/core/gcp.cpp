@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Logger.h"
+#include "thoth/Logger.h"
 
 std::string GCPRuntimeConfig::get(const std::string& key) const { return m_config.at(key); }
 

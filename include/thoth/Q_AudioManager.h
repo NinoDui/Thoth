@@ -1,4 +1,7 @@
 #pragma once
+#include <fmt/ostream.h>
+#include <spdlog/fmt/ostr.h>
+
 #include <QAudioOutput>
 #include <QMediaPlayer>
 #include <QObject>
@@ -9,14 +12,17 @@
 #include <string>
 #include <vector>
 
-class AudioCache;
-class TTSDownloader;
+#include "AudioCache.h"
 
-class AudioManager : public QObject {
+class Q_GCPTTSDownloader;
+
+class Q_AudioManager : public QObject {
     Q_OBJECT
    public:
-    explicit AudioManager(QObject* parent = nullptr);
-    ~AudioManager();
+    explicit Q_AudioManager(QObject* parent = nullptr);
+    ~Q_AudioManager();
+
+    std::filesystem::path getCacheDir() const;
 
     void play(int idx);
     void pause();
@@ -37,6 +43,12 @@ class AudioManager : public QObject {
     // Export the audio file
     void exportAudioToOne(const std::filesystem::path& dstPath) const;
 
+    friend std::ostream& operator<<(std::ostream& os, const Q_AudioManager& audioManager);
+    friend QDebug operator<<(QDebug dbg, const Q_AudioManager& audioManager);
+
+    // Dump the state for debug
+    void dumpState() const;
+
    signals:
     void currentSentenceChange(int idx);
     void playbackStarted(int idx);
@@ -48,7 +60,7 @@ class AudioManager : public QObject {
     QAudioOutput* m_audioOutput;
     QTimer* m_delayTimer;
 
-    TTSDownloader* m_ttsDownloader;
+    Q_GCPTTSDownloader* m_ttsDownloader;
     std::unique_ptr<AudioCache> m_audioCache;
 
     // TODO: replace with reference to avoid deep copying
@@ -64,5 +76,8 @@ class AudioManager : public QObject {
     // Lazy load, prefetch the audio files for the following context window.
     void fetchNext(int start_idx, int window_size = PRELOAD_WINDOW);
 
-    static const int PRELOAD_WINDOW = 3;
+    static constexpr int PRELOAD_WINDOW = 3;
 };
+
+template <>
+struct fmt::formatter<Q_AudioManager> : fmt::ostream_formatter {};
