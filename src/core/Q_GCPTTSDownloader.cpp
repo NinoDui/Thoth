@@ -4,7 +4,7 @@
 #include <QtConcurrent>
 #include <iostream>
 
-#include "Logger.h"
+#include "thoth/Logger.h"
 
 Q_GCPTTSDownloader::Q_GCPTTSDownloader(QObject* parent)
     : QObject(parent), m_ttsClient(std::make_shared<GCPTextToSpeechClient>()) {}

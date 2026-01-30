@@ -9,6 +9,7 @@ class AudioCache {
    public:
     // "explicit" to avoid shadowing convert
     explicit AudioCache(const std::filesystem::path& cache_dir = "cache", bool override = false);
+    ~AudioCache() = default;
 
     // foo () const; -> READ ONLY
     std::optional<std::filesystem::path> get(const std::string& sentence) const;
