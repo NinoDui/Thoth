@@ -10,7 +10,7 @@ class TextParser {
    public:
     TextParser() = default;
 
-    Sentences parseFile(const std::filesystem::path& path);
+    Sentences parseFile(const std::filesystem::path &path);
 
    private:
     RegexSegmenter _segmenter;

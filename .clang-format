@@ -7,5 +7,5 @@ TabWidth: 4
 UseTab: Never
 
 Standard: Auto
-PointerAlignment: Right
+PointerAlignment: Left 
 SortIncludes: true

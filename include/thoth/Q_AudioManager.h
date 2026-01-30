@@ -3,6 +3,7 @@
 #include <spdlog/fmt/ostr.h>
 
 #include <QAudioOutput>
+#include <QDebug>
 #include <QMediaPlayer>
 #include <QObject>
 #include <QTimer>
