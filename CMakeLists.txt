@@ -8,7 +8,10 @@ set(CMAKE_AUTOUIC ON)   # automatically generate UI header files from UI files
 set(CMAKE_AUTORCC ON)   # automatically scanning .qrc files
 set(CMAKE_AUTOMOC ON)   # automatically scanning header files containing Qt meta-objects
 
-add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    # avoid Unicode character encoding issues in Windows
+# add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    # avoid Unicode character encoding issues in Windows
+if(MSVC)
+    add_compile_options("/utf-8")
+endif()
 
 # Dependencies
 find_package(Qt6 COMPONENTS Core Concurrent Widgets Network Multimedia REQUIRED)
