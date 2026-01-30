@@ -4,9 +4,11 @@ project(Thoth LANGUAGES CXX)
 # Global Settings
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTOUIC ON)   # automatically generate UI header files from UI files
 set(CMAKE_AUTORCC ON)   # automatically scanning .qrc files
 set(CMAKE_AUTOMOC ON)   # automatically scanning header files containing Qt meta-objects
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    # avoid Unicode character encoding issues in Windows
 if(MSVC)
@@ -18,14 +20,7 @@ find_package(Qt6 COMPONENTS Core Concurrent Widgets Network Multimedia REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(google_cloud_cpp_texttospeech REQUIRED)
 find_package(spdlog REQUIRED)
-
-include(FetchContent)
-FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/refs/heads/main.zip
-)
-set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+find_package(GTest CONFIG REQUIRED)
 
 # Target-1, ThothCore Logic (as a static library)
 
@@ -49,18 +44,21 @@ target_include_directories(ThothCore
 
 target_link_libraries(ThothCore
     PUBLIC
+        # for dependencies wihch is exposed by headers under include/thoth
         Qt6::Core
         Qt6::Network
         Qt6::Concurrent
         Qt6::Multimedia
         google-cloud-cpp::texttospeech
-    PRIVATE 
         spdlog::spdlog
+    PRIVATE 
+        nlohmann_json::nlohmann_json
 )
 
 # Target-2, ThothApp
 add_executable(ThothApp
     src/main.cpp
+    src/app/Q_AppMainWindow.cpp
 )
 
 target_link_libraries(ThothApp PRIVATE
@@ -69,7 +67,7 @@ target_link_libraries(ThothApp PRIVATE
 )
 
 if(WIN32)
-    set_target_properties(ThothApp PROPERTIES WIN32_EXECUTABLE ON)
+    # set_target_properties(ThothApp PROPERTIES WIN32_EXECUTABLE ON)
 endif()
 
 # Target-3, Thoth Unit Tests
