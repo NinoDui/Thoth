@@ -32,12 +32,22 @@ Q_AudioManager::Q_AudioManager(QObject* parent)
 
     connect(m_delayTimer, &QTimer::timeout, this, [this]() { play(m_curIdx); });
 
-    connect(m_player, &QMediaPlayer::errorOccurred, this,
-            [this](QMediaPlayer::Error error, const QString& errorMsg) {
-                LOG_ERROR("MediaPlayer error {}", errorMsg.toStdString());
-                LOG_INFO("Skipping to the next sencence, due to error occurred.");
+    connect(
+        m_player, &QMediaPlayer::errorOccurred, this,
+        [this](QMediaPlayer::Error error, const QString& errorMsg) {
+            LOG_ERROR("MediaPlayer error (Code {}): {}", (int)error, errorMsg.toStdString());
+            LOG_WARNING("Due to an unexpected error occured, skipping to the next sencence [{}]",
+                        m_singleLoop ? m_curIdx : m_curIdx + 1);
+
+            if (m_curIdx >= m_playlist.size() - 1) {
+                LOG_WARNING(
+                    "No more sentences to play, stopping the player and emitting finished signal.");
+                stop();
+                emit playbackFinished(m_curIdx);
+            } else {
                 playNext();
-            });
+            }
+        });
 }
 
 Q_AudioManager::~Q_AudioManager() = default;

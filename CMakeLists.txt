@@ -25,10 +25,13 @@ set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 # Target-1, ThothCore Logic (as a static library)
+
 file(GLOB CORE_SRCS src/core/*.cpp)
 message(STATUS "CORE_SRCS: ${CORE_SRCS}")
+
 file(GLOB CORE_PUB_HDRS include/thoth/*.h)
 message(STATUS "CORE_PUB_HDRS: ${CORE_PUB_HDRS}")
+
 add_library(ThothCore STATIC
     ${CORE_SRCS}
     ${CORE_PUB_HDRS}
@@ -46,9 +49,9 @@ target_link_libraries(ThothCore
         Qt6::Core
         Qt6::Network
         Qt6::Concurrent
+        Qt6::Multimedia
         google-cloud-cpp::texttospeech
     PRIVATE 
-        Qt6::Multimedia
         spdlog::spdlog
 )
 
