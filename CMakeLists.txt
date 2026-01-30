@@ -11,10 +11,10 @@ set(CMAKE_AUTOMOC ON)   # automatically scanning header files containing Qt meta
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    # avoid Unicode character encoding issues in Windows
 
 # Dependencies
-find_package(Qt6 COMPONENTS Core Widgets Network Multimedia REQUIRED)
-find_package(CURL REQUIRED)
+find_package(Qt6 COMPONENTS Core Concurrent Widgets Network Multimedia REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(google_cloud_cpp_texttospeech REQUIRED)
+find_package(spdlog REQUIRED)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -45,10 +45,11 @@ target_link_libraries(ThothCore
     PUBLIC
         Qt6::Core
         Qt6::Network
-        CURL::libcurl
+        Qt6::Concurrent
         google-cloud-cpp::texttospeech
     PRIVATE 
         Qt6::Multimedia
+        spdlog::spdlog
 )
 
 # Target-2, ThothApp
@@ -68,7 +69,10 @@ endif()
 # Target-3, Thoth Unit Tests
 enable_testing()
 
-file(GLOB TEST_SRCS test/*.cpp)
+# file(GLOB TEST_SRCS test/*.cpp)
+SET(TEST_SRCS
+    test/TextParserTest.cpp
+)
 message(STATUS "TEST_SRCS: ${TEST_SRCS}")
 add_executable(ThothTests
     ${TEST_SRCS}

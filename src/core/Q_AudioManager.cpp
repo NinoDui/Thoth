@@ -1,8 +1,9 @@
 #include <thoth/AudioCache.h>
 #include <thoth/Q_AudioManager.h>
-#include <thoth/Q_TTSDownloader.h>
 
 #include <iostream>
+
+#include "Q_GCPTTSDownloader.h"
 
 AudioManager::AudioManager(QObject* parent)
     : QObject(parent),
@@ -11,7 +12,7 @@ AudioManager::AudioManager(QObject* parent)
       m_player(new QMediaPlayer(this)),
       m_audioOutput(new QAudioOutput(this)),
       m_delayTimer(new QTimer(this)),
-      m_ttsDownloader(new TTSDownloader(this)) {
+      m_ttsDownloader(new Q_GCPTTSDownloader(this)) {
     m_player->setAudioOutput(m_audioOutput);
     m_delayTimer->setSingleShot(true);
 
