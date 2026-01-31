@@ -13,6 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    # avoid Unicode character encoding issues in Windows
 if(MSVC)
     add_compile_options("/utf-8")
+    # add_compile_options("/fsanitize=address")
 endif()
 
 # Dependencies

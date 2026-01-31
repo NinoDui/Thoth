@@ -1,3 +1,5 @@
+#include <regex>
+
 #include "internal/Segmenter.h"
 
 Sentences RegexSegmenter::segment(std::string_view text) const {
