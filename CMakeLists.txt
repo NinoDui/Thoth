@@ -30,16 +30,23 @@ message(STATUS "CORE_SRCS: ${CORE_SRCS}")
 file(GLOB CORE_PUB_HDRS include/thoth/*.h)
 message(STATUS "CORE_PUB_HDRS: ${CORE_PUB_HDRS}")
 
+file(GLOB CORE_INT_HDRS src/core/internal/*.h)
+message(STATUS "CORE_INT_HDRS: ${CORE_INT_HDRS}")
+
+# Let the building system (CMake/Moc/Rcc) know "required" sources
 add_library(ThothCore STATIC
     ${CORE_SRCS}
     ${CORE_PUB_HDRS}
+    ${CORE_INT_HDRS}
 )
 
+# Controlling visibility
 target_include_directories(ThothCore
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/core/internal
 )
 
 target_link_libraries(ThothCore
@@ -57,8 +64,9 @@ target_link_libraries(ThothCore
 
 # Target-2, ThothApp
 add_executable(ThothApp
-    src/main.cpp
+    src/app/main.cpp
     src/app/Q_AppMainWindow.cpp
+    src/app/Q_AppMainWindow.h
 )
 
 target_link_libraries(ThothApp PRIVATE
@@ -83,7 +91,8 @@ add_executable(ThothTests
 )
 
 target_include_directories(ThothTests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/internal
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 

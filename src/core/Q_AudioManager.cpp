@@ -3,9 +3,8 @@
 
 #include <iostream>
 
-#include "Q_GCPTTSDownloader.h"
-#include "thoth/AudioCache.h"
-
+#include "internal/AudioCache.h"
+#include "internal/Q_GCPTTSDownloader.h"
 
 Q_AudioManager::Q_AudioManager(QObject* parent)
     : QObject(parent),

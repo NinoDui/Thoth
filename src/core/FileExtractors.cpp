@@ -2,7 +2,7 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "thoth/FileExtractor.h"
+#include "internal/FileExtractor.h"
 
 class TxtExtractor : public FileExtractor {
    public:

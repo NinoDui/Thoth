@@ -1,4 +1,4 @@
-#include "gcp.h"
+#include "internal/gcp.h"
 
 #include <google/cloud/texttospeech/v1/text_to_speech_connection.h>
 
