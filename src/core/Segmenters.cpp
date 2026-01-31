@@ -1,5 +1,6 @@
-#include "Segmenter.h"
+#include <regex>
 
+#include "internal/Segmenter.h"
 
 Sentences RegexSegmenter::segment(std::string_view text) const {
     Sentences sentences;
@@ -9,7 +10,7 @@ Sentences RegexSegmenter::segment(std::string_view text) const {
 
     std::string content(text);
     std::sregex_token_iterator first{content.begin(), content.end(), re, -1};
-    std::sregex_token_iterator last;    // none by default
+    std::sregex_token_iterator last;  // none by default
 
     for (auto it = first; it != last; ++it) {
         if (it->length() > 0 && isValidSentence(it->str())) {
@@ -44,7 +45,4 @@ bool RegexSegmenter::isValidSentence(const std::string& raw) const {
     return true;
 }
 
-
-std::unique_ptr<Segmenter> createRegexSegmenter() {
-    return std::make_unique<RegexSegmenter>();
-}
+std::unique_ptr<Segmenter> createRegexSegmenter() { return std::make_unique<RegexSegmenter>(); }

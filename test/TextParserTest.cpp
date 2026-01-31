@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
-#include <core/TextParser.h>
 
 #include <filesystem>
 
-namespace fs = std::filesystem;
+#include "thoth/TextParser.h"
 
+namespace fs = std::filesystem;
 
 TEST(TextParserTest, HandleEmptyFile) {
     TextParser parser;
@@ -14,7 +14,7 @@ TEST(TextParserTest, HandleEmptyFile) {
 TEST(TextParserTest, HandleShortTxtArticle) {
     fs::path resource_dir = TEST_RESOURCE_DIR;
     fs::path article_path = resource_dir / "short_article.txt";
-    
+
     TextParser parser;
     auto sentences = parser.parseFile(article_path);
 
