@@ -2,7 +2,6 @@
 
 #include <QFutureWatcher>
 #include <QtConcurrent>
-#include <iostream>
 
 #include "thoth/Logger.h"
 
