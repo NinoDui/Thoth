@@ -14,7 +14,7 @@ CompileFlags:
     - /W*
 
 Diagnostics:
-  UnunsedIncludes: None
+  UnusedIncludes: None
   MissingIncludes: None
   ClangTidy:
     Remove:

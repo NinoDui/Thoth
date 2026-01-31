@@ -142,7 +142,7 @@ void Q_AudioManager::prepareAndPlay(int idx) {
                 emit playbackStarted(idx);
             }
         } else {
-            std::cerr << "Failed to download sentence " << idx << std::endl;
+            LOG_ERROR("Failed to download sentence [{}]: \"{}\"", idx, sentence);
         }
     });
 }
