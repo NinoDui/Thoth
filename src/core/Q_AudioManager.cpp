@@ -32,22 +32,20 @@ Q_AudioManager::Q_AudioManager(QObject* parent)
 
     connect(m_delayTimer, &QTimer::timeout, this, [this]() { play(m_curIdx); });
 
-    connect(
-        m_player, &QMediaPlayer::errorOccurred, this,
-        [this](QMediaPlayer::Error error, const QString& errorMsg) {
-            LOG_ERROR("MediaPlayer error (Code {}): {}", (int)error, errorMsg.toStdString());
-            LOG_WARNING("Due to an unexpected error occured, skipping to the next sencence [{}]",
-                        m_singleLoop ? m_curIdx : m_curIdx + 1);
-
-            if (m_curIdx >= m_playlist.size() - 1) {
+    connect(m_player, &QMediaPlayer::errorOccurred, this,
+            [this](QMediaPlayer::Error error, const QString& errorMsg) {
+                LOG_ERROR("MediaPlayer error (Code {}): {}", (int)error, errorMsg.toStdString());
                 LOG_WARNING(
-                    "No more sentences to play, stopping the player and emitting finished signal.");
-                stop();
-                emit playbackFinished(m_curIdx);
-            } else {
-                playNext();
-            }
-        });
+                    "Due to an unexpected error occured, skipping to the next sencence [{}]",
+                    m_singleLoop ? m_curIdx : m_curIdx + 1);
+
+                if (m_curIdx < m_playlist.size() - 1) {
+                    QTimer::singleShot(0, this, [this]() { playNext(); });
+                } else {
+                    stop();
+                    emit playbackFinished(m_curIdx);
+                }
+            });
 }
 
 Q_AudioManager::~Q_AudioManager() = default;
@@ -55,24 +53,27 @@ Q_AudioManager::~Q_AudioManager() = default;
 std::filesystem::path Q_AudioManager::getCacheDir() const { return m_audioCache->getCacheDir(); }
 
 void Q_AudioManager::play(int idx) {
-    if (idx < 0 || idx >= m_playlist.size()) return;
+    if (idx < 0 || idx >= m_playlist.size()) {
+        LOG_WARNING("Invalid index [{}], expected range [0, {})", idx, m_playlist.size());
+        return;
+    }
 
     m_curIdx = idx;
     prepareAndPlay(idx);
-
     fetchNext(idx);
 }
 
 void Q_AudioManager::setPlaylist(const std::vector<std::string>& playlist) {
     stop();
     m_playlist = playlist;
-    m_curIdx = -1;
+    m_curIdx = DEFAULT_START_IDX;
     m_downloadingIdx.clear();
 }
 
 void Q_AudioManager::pause() { m_player->pause(); }
 
 void Q_AudioManager::resume() {
+    LOG_DEBUG("Resume is called, current index: {}", m_curIdx);
     if (m_player->playbackState() == QMediaPlayer::PausedState) {
         m_player->play();
     } else if (m_curIdx >= 0 && m_curIdx < m_playlist.size()) {
@@ -116,35 +117,28 @@ void Q_AudioManager::exportAudioToOne(const std::filesystem::path& dstPath) cons
 
 void Q_AudioManager::prepareAndPlay(int idx) {
     auto localPath = m_audioCache->get(idx);
-    // hit the cache, ready for play
-    if (localPath) {
-        m_player->setSource(QUrl::fromLocalFile(QString::fromStdString(localPath->string())));
-        m_player->play();
-        emit playbackStarted(idx);
-        return;
-    }
-
-    // cache missed, but is downloading
-    if (m_downloadingIdx.contains(idx)) {
-        return;
-    }
-
-    m_downloadingIdx.insert(idx);
-    std::string sentence = m_playlist[idx];
-    m_ttsDownloader->download(sentence, [this, idx, sentence](bool success, QByteArray data) {
-        m_downloadingIdx.erase(idx);
-        if (success) {
-            auto dstPath = m_audioCache->saveAudio(idx, sentence, data);
-
-            if (idx == m_curIdx) {
-                m_player->setSource(QUrl::fromLocalFile(QString::fromStdString(dstPath.string())));
-                m_player->play();
-                emit playbackStarted(idx);
-            }
-        } else {
-            LOG_ERROR("Failed to download sentence [{}]: \"{}\"", idx, sentence);
+    if (!localPath) {
+        std::string sentence = m_playlist[idx];
+        try {
+            m_ttsDownloader->download(
+                sentence, [this, idx, sentence](bool success, QByteArray data) {
+                    if (success) {
+                        auto dstPath = m_audioCache->saveAudio(idx, sentence, data);
+                        LOG_DEBUG("Downloaded sentence [{}]: \"{}\" to {}", idx, sentence,
+                                  dstPath.string());
+                        playSingleSentence(idx, dstPath);
+                    } else {
+                        LOG_ERROR("Failed to download sentence [{}]: \"{}\"", idx, sentence);
+                    }
+                });
+        } catch (const std::exception& e) {
+            LOG_ERROR("Exception occured in downloading thread, current Audio Manager status is {}",
+                      *this);
         }
-    });
+    } else {
+        LOG_DEBUG("Playing sentence [{}]: \"{}\" from cache", idx, m_playlist[idx]);
+        playSingleSentence(idx, localPath.value());
+    }
 }
 
 void Q_AudioManager::fetchNext(int start_idx, int window_size) {
@@ -152,16 +146,36 @@ void Q_AudioManager::fetchNext(int start_idx, int window_size) {
         int next_idx = start_idx + i;
 
         if (!m_audioCache->get(next_idx)) {
-            m_ttsDownloader->download(
-                m_playlist[next_idx], [this, next_idx](bool success, QByteArray data) {
-                    if (success) {
-                        m_audioCache->saveAudio(next_idx, m_playlist[next_idx], data);
-                    } else {
-                        std::cerr << "Failed to download sentence " << next_idx << std::endl;
-                    }
-                });
+            try {
+                m_ttsDownloader->download(
+                    m_playlist[next_idx], [this, next_idx](bool success, QByteArray data) {
+                        if (success) {
+                            m_audioCache->saveAudio(next_idx, m_playlist[next_idx], data);
+                        } else {
+                            LOG_ERROR("Failed to download sentence [{}]: \"{}\"", next_idx,
+                                      m_playlist[next_idx]);
+                        }
+                    });
+            } catch (const std::exception& e) {
+                LOG_ERROR(
+                    "Exception occured in downloading thread, current Audio Manager status is {}",
+                    *this);
+            }
         }
     }
+}
+
+void Q_AudioManager::playSingleSentence(int idx, const std::filesystem::path& localPath) {
+    QString qPath;
+#ifdef _WIN32
+    qPath = QString::fromStdWString(localPath.wstring());
+#else
+    qPath = QString::fromStdString(localPath.string());
+#endif
+    LOG_DEBUG("Sending file {} to player", qPath.toStdString());
+    m_player->setSource(QUrl::fromLocalFile(qPath));
+    m_player->play();
+    emit playbackStarted(idx);
 }
 
 std::string playbackStateToString(QMediaPlayer::PlaybackState state) {

@@ -25,7 +25,7 @@ find_package(GTest CONFIG REQUIRED)
 
 # Target-1, ThothCore Logic (as a static library)
 
-file(GLOB CORE_SRCS src/core/*.cpp)
+file(GLOB_RECURSE CORE_SRCS src/core/*.cpp)
 message(STATUS "CORE_SRCS: ${CORE_SRCS}")
 
 file(GLOB CORE_PUB_HDRS include/thoth/*.h)
@@ -134,7 +134,8 @@ add_custom_target(ThothDocs
 
 # Target-5, Thoth Clean
 add_custom_target(ThothClean
-    COMMAND rm -rf ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Cleaning build directory..."
 )
 
 # Code Formatting
