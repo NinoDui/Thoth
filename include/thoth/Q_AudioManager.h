@@ -13,8 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "AudioCache.h"
-
+class AudioCache;
 class Q_GCPTTSDownloader;
 
 class Q_AudioManager : public QObject {

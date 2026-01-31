@@ -3,15 +3,18 @@
 #include <string>
 #include <vector>
 
-#include "FileExtractor.h"
-#include "Segmenter.h"
+class Segmenter;
 
 class TextParser {
    public:
-    TextParser() = default;
+    TextParser();
 
-    Sentences parseFile(const std::filesystem::path &path);
+    // Segmenter is predeclared in the header file
+    // so here we need to AVOID impl but only declare the destructor
+    ~TextParser();
+
+    std::vector<std::string> parseFile(const std::filesystem::path& path);
 
    private:
-    RegexSegmenter _segmenter;
+    std::unique_ptr<Segmenter> _segmenter;
 };

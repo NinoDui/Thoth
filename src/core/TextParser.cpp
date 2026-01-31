@@ -1,7 +1,14 @@
 #include "thoth/TextParser.h"
 
-Sentences TextParser::parseFile(const std::filesystem::path &path) {
+#include "internal/FileExtractor.h"
+#include "internal/Segmenter.h"
+
+TextParser::TextParser() : _segmenter(createRegexSegmenter()) {}
+
+TextParser::~TextParser() = default;
+
+std::vector<std::string> TextParser::parseFile(const std::filesystem::path& path) {
     auto extractor = createFileExtractor(path);
     std::string content = extractor->extract(path);
-    return _segmenter.segment(content);
+    return _segmenter->segment(content);
 }

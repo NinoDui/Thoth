@@ -1,4 +1,4 @@
-#include "Q_GCPTTSDownloader.h"
+#include "internal/Q_GCPTTSDownloader.h"
 
 #include <QFutureWatcher>
 #include <QtConcurrent>
