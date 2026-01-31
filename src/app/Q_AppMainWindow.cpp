@@ -5,7 +5,12 @@
 #include <QMessageBox>
 #include <QStyle>
 
-Q_AppMainWindow::Q_AppMainWindow(QWidget* parent) : QMainWindow(parent) {
+#include "thoth/Logger.h"
+
+Q_AppMainWindow::Q_AppMainWindow(QWidget* parent)
+    : QMainWindow(parent),
+      m_audioManager(std::make_unique<Q_AudioManager>()),
+      m_textParser(std::make_unique<TextParser>()) {
     setupUI();
     setupConnections();
 
@@ -69,7 +74,20 @@ void Q_AppMainWindow::setupUI() {
 }
 
 void Q_AppMainWindow::setupConnections() {
-    connect(m_btnPlay, &QPushButton::clicked, [this]() { m_audioManager->resume(); });
+    connect(m_btnPlay, &QPushButton::clicked, [this]() {
+        try {
+            m_audioManager->resume();
+        } catch (const std::filesystem::filesystem_error& e) {
+            LOG_CRITICAL("Filesystem error: {} | Path1: {} | Path2: {}", e.what(),
+                         e.path1().string(), e.path2().string());
+        } catch (const std::exception& e) {
+            LOG_ERROR(
+                "Exception occured in resume, current Audio Manager status is {}, error is {}",
+                *m_audioManager, e.what());
+        } catch (...) {
+            LOG_CRITICAL("Play Error: Unknown non-std exception");
+        }
+    });
     connect(m_btnPause, &QPushButton::clicked, [this]() { m_audioManager->pause(); });
     connect(m_btnPrev, &QPushButton::clicked, [this]() { m_audioManager->playPrevious(); });
 
@@ -85,20 +103,35 @@ void Q_AppMainWindow::setupConnections() {
 
 void Q_AppMainWindow::onImportFile() {
     QString fileName = QFileDialog::getOpenFileName(this, "Open Text", "", "Text Files (*.txt)");
-    if (fileName.isEmpty()) return;
+    if (fileName.isEmpty()) {
+        LOG_WARNING("No file selected, skipping ...");
+        return;
+    } else {
+        LOG_INFO("File selected: {}", fileName.toStdString());
+    }
 
     m_lblStatus->setText("Loading: " + fileName);
     std::vector<std::string> sentences = m_textParser->parseFile(fileName.toStdString());
+    LOG_DEBUG("Parsed {} sentences", sentences.size());
 
     m_lstContent->clear();
+    m_lblStatus->setText("Loaded " + QString::number(sentences.size()) + " sentences");
     for (const auto& sentence : sentences) {
         m_lstContent->addItem(QString::fromStdString(sentence));
     }
+
+    m_audioManager->setPlaylist(sentences);
 }
 
 void Q_AppMainWindow::onExportAudio() {}
 
-void Q_AppMainWindow::onPlayClicked() { m_audioManager->resume(); }
+void Q_AppMainWindow::onPlayClicked() {
+    if (m_audioManager->isPlaying()) {
+        m_audioManager->pause();
+    } else {
+        m_audioManager->resume();
+    }
+}
 
 void Q_AppMainWindow::onPauseClicked() { m_audioManager->pause(); }
 

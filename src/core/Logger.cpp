@@ -53,7 +53,7 @@ void LogManager::init(const std::string& appName) {
         auto logger = std::make_shared<spdlog::async_logger>(appName, sinks.begin(), sinks.end(),
                                                              spdlog::thread_pool(),
                                                              spdlog::async_overflow_policy::block);
-        logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%t] [%^%l%$] %v");
+        logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%t] [%s:%# %!] [%^%l%$] %v");
         logger->set_level(spdlog::level::debug);
         logger->flush_on(spdlog::level::info);
 

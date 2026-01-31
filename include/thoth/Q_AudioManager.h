@@ -66,7 +66,7 @@ class Q_AudioManager : public QObject {
     // TODO: replace with reference to avoid deep copying
     std::vector<std::string> m_playlist;
     std::set<int> m_downloadingIdx;
-    int m_curIdx = -1;
+    int m_curIdx = DEFAULT_START_IDX;
     bool m_singleLoop = false;
     int m_loopDelaySeconds = 0;
 
@@ -76,7 +76,10 @@ class Q_AudioManager : public QObject {
     // Lazy load, prefetch the audio files for the following context window.
     void fetchNext(int start_idx, int window_size = PRELOAD_WINDOW);
 
+    void playSingleSentence(int idx, const std::filesystem::path& localPath);
+
     static constexpr int PRELOAD_WINDOW = 3;
+    static constexpr int DEFAULT_START_IDX = 0;
 };
 
 template <>
