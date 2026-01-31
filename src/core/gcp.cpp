@@ -95,14 +95,23 @@ std::vector<uint8_t> GCPTextToSpeechClient::execute(const std::string& text) {
     tts::AudioConfig audioConfig;
     audioConfig.set_audio_encoding(tts::AudioEncoding::MP3);
 
-    auto response = m_client.SynthesizeSpeech(input, voiceParam, audioConfig);
-    if (!response) {
-        throw std::move(response).status();
-    }
+    LOG_TRACE("Synthesizing speech for text: {}", text);
+    try {
+        auto response = m_client.SynthesizeSpeech(input, voiceParam, audioConfig);
+        if (!response) {
+            throw std::move(response).status();
+        }
 
-    if (!response.ok()) {
-        throw std::runtime_error("Failed to synthesize speech: " + response.status().message());
+        if (!response.ok()) {
+            throw std::runtime_error("Failed to synthesize speech: " + response.status().message());
+        }
+        return std::vector<uint8_t>(response->audio_content().begin(),
+                                    response->audio_content().end());
+    } catch (const std::exception& e) {
+        LOG_ERROR("Failed to synthesize speech: {}", e.what());
+        return std::vector<uint8_t>();
+    } catch (...) {
+        LOG_CRITICAL("Unknown error occurred in synthesizing speech");
+        return std::vector<uint8_t>();
     }
-
-    return std::vector<uint8_t>(response->audio_content().begin(), response->audio_content().end());
 }

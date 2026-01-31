@@ -29,6 +29,7 @@ class ConfigStore {
 
     std::filesystem::path getTempDir() const;
     std::filesystem::path getCacheDir() const;
+    std::filesystem::path getLogDir() const;
 
     friend std::ostream& operator<<(std::ostream& os, const ConfigStore& config);
 

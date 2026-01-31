@@ -24,9 +24,9 @@ class Q_AudioManager : public QObject {
 
     std::filesystem::path getCacheDir() const;
 
+    // the functions TRULY change the internal state!
     void play(int idx);
-    void pause();
-    void resume();
+    void reset();
     void stop();
 
     // Content
@@ -34,6 +34,8 @@ class Q_AudioManager : public QObject {
 
     // Play Controlling
     bool isPlaying() const;
+    void pause();
+    void resume();
     void playNext();
     void playPrevious();
 
@@ -76,7 +78,7 @@ class Q_AudioManager : public QObject {
     // Lazy load, prefetch the audio files for the following context window.
     void fetchNext(int start_idx, int window_size = PRELOAD_WINDOW);
 
-    void playSingleSentence(int idx, const std::filesystem::path& localPath);
+    void _Q_play(int idx, const std::filesystem::path& localPath);
 
     static constexpr int PRELOAD_WINDOW = 3;
     static constexpr int DEFAULT_START_IDX = 0;

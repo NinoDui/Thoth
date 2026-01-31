@@ -63,11 +63,15 @@ void Q_AudioManager::play(int idx) {
     fetchNext(idx);
 }
 
-void Q_AudioManager::setPlaylist(const std::vector<std::string>& playlist) {
+void Q_AudioManager::reset() {
     stop();
-    m_playlist = playlist;
     m_curIdx = DEFAULT_START_IDX;
     m_downloadingIdx.clear();
+}
+
+void Q_AudioManager::setPlaylist(const std::vector<std::string>& playlist) {
+    reset();
+    m_playlist = playlist;
 }
 
 void Q_AudioManager::pause() { m_player->pause(); }
@@ -117,27 +121,36 @@ void Q_AudioManager::exportAudioToOne(const std::filesystem::path& dstPath) cons
 
 void Q_AudioManager::prepareAndPlay(int idx) {
     auto localPath = m_audioCache->get(idx);
-    if (!localPath) {
-        std::string sentence = m_playlist[idx];
-        try {
-            m_ttsDownloader->download(
-                sentence, [this, idx, sentence](bool success, QByteArray data) {
-                    if (success) {
-                        auto dstPath = m_audioCache->saveAudio(idx, sentence, data);
-                        LOG_DEBUG("Downloaded sentence [{}]: \"{}\" to {}", idx, sentence,
-                                  dstPath.string());
-                        playSingleSentence(idx, dstPath);
-                    } else {
-                        LOG_ERROR("Failed to download sentence [{}]: \"{}\"", idx, sentence);
-                    }
-                });
-        } catch (const std::exception& e) {
-            LOG_ERROR("Exception occured in downloading thread, current Audio Manager status is {}",
-                      *this);
-        }
-    } else {
-        LOG_DEBUG("Playing sentence [{}]: \"{}\" from cache", idx, m_playlist[idx]);
-        playSingleSentence(idx, localPath.value());
+
+    if (localPath) {
+        LOG_DEBUG("Playing sentence [{}] from cache", idx);
+        _Q_play(idx, localPath.value());
+        return;
+    }
+
+    if (m_downloadingIdx.contains(idx)) {
+        LOG_INFO("Sentence [{}] is already being downloaded, waiting for completion", idx);
+        return;
+    }
+
+    m_downloadingIdx.insert(idx);
+    std::string sentence = m_playlist[idx];
+    try {
+        m_ttsDownloader->download(sentence, [this, idx, sentence](bool success, QByteArray data) {
+            if (success) {
+                auto p = m_audioCache->saveAudio(idx, sentence, data);
+                LOG_DEBUG("Downloaded sentence [{}] to {}", idx, p.string());
+                if (idx == m_curIdx) _Q_play(idx, p);
+            } else {
+                LOG_ERROR("TTS Client failed to download sentence [{}]", idx);
+            }
+            m_downloadingIdx.erase(idx);
+        });
+    } catch (const std::exception& e) {
+        LOG_ERROR(
+            "Exception occured in downloading thread due to {}, current Audio Manager status is {}",
+            e.what(), *this);
+        m_downloadingIdx.erase(idx);
     }
 }
 
@@ -145,27 +158,31 @@ void Q_AudioManager::fetchNext(int start_idx, int window_size) {
     for (int i = 1; start_idx + i < m_playlist.size() && i <= window_size; ++i) {
         int next_idx = start_idx + i;
 
-        if (!m_audioCache->get(next_idx)) {
-            try {
-                m_ttsDownloader->download(
-                    m_playlist[next_idx], [this, next_idx](bool success, QByteArray data) {
-                        if (success) {
-                            m_audioCache->saveAudio(next_idx, m_playlist[next_idx], data);
-                        } else {
-                            LOG_ERROR("Failed to download sentence [{}]: \"{}\"", next_idx,
-                                      m_playlist[next_idx]);
-                        }
-                    });
-            } catch (const std::exception& e) {
-                LOG_ERROR(
-                    "Exception occured in downloading thread, current Audio Manager status is {}",
-                    *this);
-            }
+        if (m_audioCache->get(next_idx)) continue;
+        if (m_downloadingIdx.contains(next_idx)) continue;
+
+        m_downloadingIdx.insert(next_idx);
+        try {
+            m_ttsDownloader->download(
+                m_playlist[next_idx], [this, next_idx](bool success, QByteArray data) {
+                    if (success) {
+                        m_audioCache->saveAudio(next_idx, m_playlist[next_idx], data);
+                    } else {
+                        LOG_ERROR("TTS Client failed to download sentence [{}]", next_idx);
+                    }
+                    m_downloadingIdx.erase(next_idx);
+                });
+        } catch (const std::exception& e) {
+            LOG_ERROR(
+                "Exception occured in downloading thread due to {}, current Audio Manager status "
+                "is {}",
+                e.what(), *this);
+            m_downloadingIdx.erase(next_idx);
         }
     }
 }
 
-void Q_AudioManager::playSingleSentence(int idx, const std::filesystem::path& localPath) {
+void Q_AudioManager::_Q_play(int idx, const std::filesystem::path& localPath) {
     QString qPath;
 #ifdef _WIN32
     qPath = QString::fromStdWString(localPath.wstring());
