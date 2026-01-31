@@ -1,8 +1,7 @@
-#include "Q_GCPTTSDownloader.h"
+#include "internal/Q_GCPTTSDownloader.h"
 
 #include <QFutureWatcher>
 #include <QtConcurrent>
-#include <iostream>
 
 #include "thoth/Logger.h"
 

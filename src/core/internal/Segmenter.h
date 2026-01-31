@@ -1,4 +1,6 @@
-#include <regex>
+#pragma once
+
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -15,6 +17,8 @@ std::unique_ptr<Segmenter> createRegexSegmenter();
 
 class RegexSegmenter : public Segmenter {
    public:
+    ~RegexSegmenter() override = default;
+
     Sentences segment(std::string_view text) const override;
 
    private:

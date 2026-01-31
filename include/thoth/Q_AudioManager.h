@@ -3,6 +3,7 @@
 #include <spdlog/fmt/ostr.h>
 
 #include <QAudioOutput>
+#include <QDebug>
 #include <QMediaPlayer>
 #include <QObject>
 #include <QTimer>
@@ -12,8 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "AudioCache.h"
-
+class AudioCache;
 class Q_GCPTTSDownloader;
 
 class Q_AudioManager : public QObject {

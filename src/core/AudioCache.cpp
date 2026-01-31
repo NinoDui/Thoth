@@ -1,4 +1,4 @@
-#include <thoth/AudioCache.h>
+#include "internal/AudioCache.h"
 
 #include <QCryptographicHash>
 #include <filesystem>
