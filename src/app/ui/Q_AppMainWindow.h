@@ -26,6 +26,7 @@ class Q_AppMainWindow : public QMainWindow {
     void onPlayClicked();
     void onPauseClicked();
     void onPrevClicked();
+    void onNextClicked();
     void onLoopToggled(bool checked);
     void onJumpToSentence(int idx);
 
@@ -44,10 +45,15 @@ class Q_AppMainWindow : public QMainWindow {
     QPushButton* m_btnPlay;
     QPushButton* m_btnPrev;
     QPushButton* m_btnPause;
+    QPushButton* m_btnNext;
     QPushButton* m_btnLoop;
 
     QSpinBox* m_spinIndex;
     QPushButton* m_btnJump;
+
+    QSpinBox* m_spinDelay;
+
+    int m_lastHighlightedIdx = -1;
 
     std::unique_ptr<Q_AudioManager> m_audioManager;
     std::unique_ptr<TextParser> m_textParser;

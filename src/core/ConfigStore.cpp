@@ -59,6 +59,7 @@ std::filesystem::path ConfigStore::getTempDir() const {
 std::filesystem::path ConfigStore::getConfigDir() const { return m_configPath.parent_path(); }
 
 std::filesystem::path ConfigStore::getCacheDir() const { return getTempDir() / "cache"; }
+std::filesystem::path ConfigStore::getLogDir() const { return getTempDir() / "log"; }
 
 std::ostream& operator<<(std::ostream& os, const ConfigStore& config) {
     os << "ConfigStore: {" << std::endl;

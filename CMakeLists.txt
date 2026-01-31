@@ -64,10 +64,25 @@ target_link_libraries(ThothCore
 )
 
 # Target-2, ThothApp
-add_executable(ThothApp
+SET(APP_ENTRY_SRC
     src/app/main.cpp
-    src/app/Q_AppMainWindow.cpp
-    src/app/Q_AppMainWindow.h
+    src/app/AppRunner.cpp
+    src/app/AppRunner.h
+)
+SET(APP_UI_SRC
+    src/app/ui/Q_AppMainWindow.cpp
+    src/app/ui/Q_AppMainWindow.h
+    src/app/ui/Q_SettingDialog.cpp
+    src/app/ui/Q_SettingDialog.h
+    src/app/ui/StyleLoader.h
+)
+SET(APP_RESOURCES
+    src/app/resources/resources.qrc
+)
+add_executable(ThothApp
+    ${APP_ENTRY_SRC}
+    ${APP_UI_SRC}
+    ${APP_RESOURCES}
 )
 
 target_link_libraries(ThothApp PRIVATE
