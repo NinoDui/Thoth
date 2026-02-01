@@ -9,6 +9,8 @@ constexpr const char* KEY_TTS_LANG = "tts/language_code";
 constexpr const char* DEFAULT_TTS_LANG = "en-US";
 constexpr const char* KEY_TTS_VOICE = "tts/voice_name";
 constexpr const char* DEFAULT_TTS_VOICE = "en-US-Wavenet-1";
+constexpr const char* KEY_TTS_AUDIO_ENCODING = "tts/audio_encoding";
+constexpr const char* DEFAULT_TTS_AUDIO_ENCODING = "MP3";
 
 constexpr const char* KEY_PROXY = "network/proxy";
 constexpr const char* DEFAULT_PROXY_HOST = "127.0.0.1";

@@ -4,20 +4,21 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMainWindow>
+#include <QMediaPlayer>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QVBoxLayout>
 #include <memory>
 
-#include "thoth/Q_AudioManager.h"
-#include "thoth/TextParser.h"
+class Q_AudioManager;
+class TextParser;
 
 class Q_AppMainWindow : public QMainWindow {
     Q_OBJECT
 
    public:
     explicit Q_AppMainWindow(QWidget* parent = nullptr);
-    ~Q_AppMainWindow() = default;
+    ~Q_AppMainWindow();
 
    private slots:
     void onImportFile();
