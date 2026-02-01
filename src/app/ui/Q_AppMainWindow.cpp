@@ -128,7 +128,7 @@ void Q_AppMainWindow::setupConnections() {
 void Q_AppMainWindow::onImportFile() {
     QString fileName = QFileDialog::getOpenFileName(this, "Open Text", "", "Text Files (*.txt)");
     if (fileName.isEmpty()) {
-        LOG_WARNING("No file selected, skipping ...");
+        LOG_WARN("No file selected, skipping ...");
         return;
     } else {
         LOG_INFO("File selected: {}", fileName.toStdString());

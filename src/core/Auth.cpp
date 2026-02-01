@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "thoth/AuthProviderFactory.h"
+#include "thoth/ConfigKey.h"
 #include "thoth/ConfigStore.h"
 #include "thoth/Logger.h"
 
@@ -19,7 +20,7 @@ class IAuthStep {
     virtual std::string getName() const = 0;
 
    protected:
-    const std::string KEY_GOOGLE_APPLICATION_CREDENTIALS = "GOOGLE_APPLICATION_CREDENTIALS";
+    const std::string ENV_KEY_GOOGLE_APPLICATION_CREDENTIALS = "GOOGLE_APPLICATION_CREDENTIALS";
 
     void setEnv(const std::string& key, const std::string& value) {
 #ifdef _WIN32
@@ -35,8 +36,8 @@ class LocalConfigAuthStep : public IAuthStep {
     std::string getName() const override { return "LocalConfigAuthStep"; }
 
     bool authenticate() override {
-        auto path =
-            ConfigStore::instance().getValue<std::string>(KEY_GOOGLE_APPLICATION_CREDENTIALS);
+        auto path = ConfigStore::instance().getValue<std::string>(
+            thoth::config::KEY_GOOGLE_CREDENTIAL_PATH);
         if (!path) {
             LOG_DEBUG("Google Application Credentials not found in local config, skipping...");
             return false;
@@ -44,7 +45,7 @@ class LocalConfigAuthStep : public IAuthStep {
 
         fs::path p(*path);
         if (isValid(p)) {
-            setEnv(KEY_GOOGLE_APPLICATION_CREDENTIALS, p.string());
+            setEnv(ENV_KEY_GOOGLE_APPLICATION_CREDENTIALS, p.string());
             return true;
         } else {
             LOG_DEBUG("Google Application Credentials file not valid: {}", p.string());
@@ -67,15 +68,16 @@ class FileRequestAuthStep : public IAuthStep {
 
     bool authenticate() override {
         if (!m_callback) {
-            LOG_WARNING("FileRequestCallback is not set, skipping...");
+            LOG_WARN("FileRequestCallback is not set, skipping...");
             return false;
         }
 
         auto path = m_callback();
 
         if (isValid(path)) {
-            setEnv(KEY_GOOGLE_APPLICATION_CREDENTIALS, path.string());
-            ConfigStore::instance().setValue(KEY_GOOGLE_APPLICATION_CREDENTIALS, path.string());
+            setEnv(ENV_KEY_GOOGLE_APPLICATION_CREDENTIALS, path.string());
+            ConfigStore::instance().setValue(thoth::config::KEY_GOOGLE_CREDENTIAL_PATH,
+                                             path.string());
             return true;
         } else {
             LOG_DEBUG("Google Application Credentials file not valid: {}", path.string());
@@ -99,7 +101,7 @@ class LoginRequestAuthStep : public IAuthStep {
 
     bool authenticate() override {
         if (!m_callback) {
-            LOG_WARNING("LoginRequestCallback is not set, skipping...");
+            LOG_WARN("LoginRequestCallback is not set, skipping...");
             return false;
         }
         throw std::runtime_error("LoginRequestCallback is not implemented");
