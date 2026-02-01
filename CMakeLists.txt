@@ -25,7 +25,7 @@ find_package(GTest CONFIG REQUIRED)
 
 # Target-1, ThothCore Logic (as a static library)
 
-file(GLOB CORE_SRCS src/core/*.cpp)
+file(GLOB_RECURSE CORE_SRCS src/core/*.cpp)
 message(STATUS "CORE_SRCS: ${CORE_SRCS}")
 
 file(GLOB CORE_PUB_HDRS include/thoth/*.h)
@@ -64,10 +64,25 @@ target_link_libraries(ThothCore
 )
 
 # Target-2, ThothApp
-add_executable(ThothApp
+SET(APP_ENTRY_SRC
     src/app/main.cpp
-    src/app/Q_AppMainWindow.cpp
-    src/app/Q_AppMainWindow.h
+    src/app/AppRunner.cpp
+    src/app/AppRunner.h
+)
+SET(APP_UI_SRC
+    src/app/ui/Q_AppMainWindow.cpp
+    src/app/ui/Q_AppMainWindow.h
+    src/app/ui/Q_SettingDialog.cpp
+    src/app/ui/Q_SettingDialog.h
+    src/app/ui/StyleLoader.h
+)
+SET(APP_RESOURCES
+    src/app/resources/resources.qrc
+)
+add_executable(ThothApp
+    ${APP_ENTRY_SRC}
+    ${APP_UI_SRC}
+    ${APP_RESOURCES}
 )
 
 target_link_libraries(ThothApp PRIVATE
@@ -134,7 +149,8 @@ add_custom_target(ThothDocs
 
 # Target-5, Thoth Clean
 add_custom_target(ThothClean
-    COMMAND rm -rf ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Cleaning build directory..."
 )
 
 # Code Formatting

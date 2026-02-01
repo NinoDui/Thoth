@@ -18,8 +18,6 @@ class Q_GCPTTSDownloader : public QObject {
     Q_OBJECT
    public:
     explicit Q_GCPTTSDownloader(QObject* parent = nullptr);
-    explicit Q_GCPTTSDownloader(const std::shared_ptr<GCPRuntimeConfig>& config,
-                                QObject* parent = nullptr);
     ~Q_GCPTTSDownloader() = default;
 
     using DownloadCallback = std::function<void(bool success, QByteArray data)>;

@@ -1,10 +1,8 @@
-#include <QApplication>
+#include <iostream>
 
-#include "Q_AppMainWindow.h"
+#include "AppRunner.h"
 
-int main(int argc, char* argv[]) {
-    QApplication app(argc, argv);
-    Q_AppMainWindow mainWindow;
-    mainWindow.show();
-    return app.exec();
+int main(int argc, char** argv) {
+    AppRunner runner(argc, argv);
+    return runner.run();
 }

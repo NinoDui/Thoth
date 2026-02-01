@@ -1,9 +1,6 @@
-#include <math.h>
-
 #include <QCoreApplication>
 #include <QObject>
 #include <QTimer>
-#include <iostream>
 
 #include "thoth/Logger.h"
 #include "thoth/Q_AudioManager.h"
