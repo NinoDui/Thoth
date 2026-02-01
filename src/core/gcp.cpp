@@ -48,12 +48,20 @@ std::vector<uint8_t> GCPTextToSpeechClient::execute(const std::string& text) {
     try {
         auto response = m_client.SynthesizeSpeech(input, voiceParam, audioConfig);
         if (!response) {
-            throw std::move(response).status();
+            // A HUGE LESSON: google::cloud::Status is not subclass of Exception!!!
+            // I should not throw any non-exception anymore (though it's allowed in C++ to throw
+            // anything)
+            // throw std::move(response).status();
+            auto staus = std::move(response).status();
+            throw std::runtime_error("GCP call failed [Code " +
+                                     std::to_string(static_cast<int>(staus.code())) +
+                                     "]: " + staus.message());
         }
 
         if (!response.ok()) {
             throw std::runtime_error("Failed to synthesize speech: " + response.status().message());
         }
+
         return std::vector<uint8_t>(response->audio_content().begin(),
                                     response->audio_content().end());
     } catch (const std::exception& e) {
