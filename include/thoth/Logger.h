@@ -1,15 +1,20 @@
 #pragma once
 
+#ifndef SPDLOG_ACTIVE_LEVEL
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+#endif
+
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/spdlog.h>
 
-#define LOG_INFO(...) spdlog::info(__VA_ARGS__)
-#define LOG_ERROR(...) spdlog::error(__VA_ARGS__)
-#define LOG_WARNING(...) spdlog::warn(__VA_ARGS__)
-#define LOG_CRITICAL(...) spdlog::critical(__VA_ARGS__)
-#define LOG_DEBUG(...) spdlog::debug(__VA_ARGS__)
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#define LOG_FATAL(...) spdlog::fatal(__VA_ARGS__)
+#include "thoth/ConfigStore.h"
+
+#define LOG_TRACE(...) SPDLOG_TRACE(__VA_ARGS__)
+#define LOG_DEBUG(...) SPDLOG_DEBUG(__VA_ARGS__)
+#define LOG_INFO(...) SPDLOG_INFO(__VA_ARGS__)
+#define LOG_WARN(...) SPDLOG_WARN(__VA_ARGS__)
+#define LOG_ERROR(...) SPDLOG_ERROR(__VA_ARGS__)
+#define LOG_CRITICAL(...) SPDLOG_CRITICAL(__VA_ARGS__)
 
 class LogManager {
    public:

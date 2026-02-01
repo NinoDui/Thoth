@@ -34,26 +34,42 @@ void qtMessageHandler(QtMsgType type, const QMessageLogContext& context, const Q
 }
 
 void LogManager::init(const std::string& appName) {
+    static const std::unordered_map<std::string, spdlog::level::level_enum> LEVEL_MAP = {
+        {"trace", spdlog::level::trace}, {"debug", spdlog::level::debug},
+        {"info", spdlog::level::info},   {"warn", spdlog::level::warn},
+        {"error", spdlog::level::err},   {"critical", spdlog::level::critical},
+    };
+
+    auto config = ConfigStore::instance().getLogConfig();
     try {
         // TODO: change the settings configurable
         spdlog::init_thread_pool(QUEUE_LENGTH, 1);
         std::vector<spdlog::sink_ptr> sinks;
 
         // To console
-        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        console_sink->set_level(spdlog::level::info);
-        sinks.push_back(console_sink);
+        if (config.toConsole) {
+            auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+            console_sink->set_level(LEVEL_MAP.at(config.level));
+            sinks.push_back(console_sink);
+        }
 
         // To file
-        auto file_sink =
-            std::make_shared<spdlog::sinks::hourly_file_sink_mt>("logs/" + appName + ".log");
-        file_sink->set_level(spdlog::level::debug);
-        sinks.push_back(file_sink);
+        if (config.toFile) {
+            auto logDir = config.logDir;
+            if (!std::filesystem::exists(logDir)) {
+                std::filesystem::create_directories(logDir);
+            }
+            auto file_sink = std::make_shared<spdlog::sinks::hourly_file_sink_mt>(
+                logDir.string() + "/" + appName + ".log");
+            // when writing to file, set the level to debug to avoid the overhead of logging
+            file_sink->set_level(spdlog::level::debug);
+            sinks.push_back(file_sink);
+        }
 
         auto logger = std::make_shared<spdlog::async_logger>(appName, sinks.begin(), sinks.end(),
                                                              spdlog::thread_pool(),
                                                              spdlog::async_overflow_policy::block);
-        logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%t] [%^%l%$] %v");
+        logger->set_pattern(config.pattern);
         logger->set_level(spdlog::level::debug);
         logger->flush_on(spdlog::level::info);
 
