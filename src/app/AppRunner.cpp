@@ -12,7 +12,10 @@
 #include "ui/StyleLoader.h"
 
 AppRunner::AppRunner(int& argc, char** argv) : m_argc(argc), m_argv(argv) {
+    // ConfigStore initialized, but it using the default log settings
+    ConfigStore::instance().init();
     // we have to ensure log is initialized FIRST!!!
+    // log settings is reset by config under ConfigStore
     m_logGuard = std::make_unique<LogManager::Guard>("ThothApp");
 }
 
@@ -20,10 +23,7 @@ AppRunner::~AppRunner() = default;
 
 void AppRunner::initEnv() {
     LOG_INFO("Initializing environment...");
-
-    // 1. Initialize configuration
-    ConfigStore::instance().init();
-    LOG_INFO("Configuration initialized, details: {}", ConfigStore::instance());
+    LOG_INFO("Configuration details: {}", ConfigStore::instance());
 
     // 2. Initialize application
     m_app = std::make_unique<QApplication>(m_argc, m_argv);

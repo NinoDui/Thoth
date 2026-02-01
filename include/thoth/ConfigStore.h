@@ -45,6 +45,15 @@ class ConfigStore {
     };
     GoogleTTSConfig getGoogleTTSConfig() const;
 
+    struct LogConfig {
+        std::string level;
+        std::string pattern;
+        bool toConsole;
+        bool toFile;
+        std::filesystem::path logDir;
+    };
+    LogConfig getLogConfig() const;
+
    private:
     ConfigStore() = default;
 
