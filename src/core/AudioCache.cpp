@@ -3,7 +3,15 @@
 #include <QCryptographicHash>
 #include <filesystem>
 
+#include "thoth/ConfigStore.h"
+
 namespace fs = std::filesystem;
+
+AudioCache::AudioCache() : m_cacheDir(ConfigStore::instance().getCacheDir()), m_override(false) {
+    if (!fs::exists(m_cacheDir) || (m_override && fs::exists(m_cacheDir))) {
+        fs::create_directories(m_cacheDir);
+    }
+}
 
 AudioCache::AudioCache(const fs::path& cache_dir, bool override)
     : m_cacheDir(cache_dir), m_override(override) {
@@ -11,6 +19,8 @@ AudioCache::AudioCache(const fs::path& cache_dir, bool override)
         fs::create_directories(m_cacheDir);
     }
 }
+
+AudioCache::~AudioCache() = default;
 
 std::string AudioCache::_hash(const std::string& sentence) const {
     QByteArray hash =
