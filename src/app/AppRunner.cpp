@@ -41,7 +41,7 @@ bool AppRunner::setupNetwork() {
         LOG_INFO("Proxy set to: {}", *proxy);
         return true;
     } else {
-        LOG_WARNING("No proxy found, the Google API is not workable.");
+        LOG_WARN("No proxy found, the Google API is not workable.");
         return false;
     }
 }

@@ -35,9 +35,8 @@ Q_AudioManager::Q_AudioManager(QObject* parent)
     connect(m_player, &QMediaPlayer::errorOccurred, this,
             [this](QMediaPlayer::Error error, const QString& errorMsg) {
                 LOG_ERROR("MediaPlayer error (Code {}): {}", (int)error, errorMsg.toStdString());
-                LOG_WARNING(
-                    "Due to an unexpected error occured, skipping to the next sencence [{}]",
-                    m_singleLoop ? m_curIdx : m_curIdx + 1);
+                LOG_WARN("Due to an unexpected error occured, skipping to the next sencence [{}]",
+                         m_singleLoop ? m_curIdx : m_curIdx + 1);
 
                 if (m_curIdx < m_playlist.size() - 1) {
                     QTimer::singleShot(0, this, [this]() { playNext(); });
@@ -54,7 +53,7 @@ std::filesystem::path Q_AudioManager::getCacheDir() const { return m_audioCache-
 
 void Q_AudioManager::play(int idx) {
     if (idx < 0 || idx >= m_playlist.size()) {
-        LOG_WARNING("Invalid index [{}], expected range [0, {})", idx, m_playlist.size());
+        LOG_WARN("Invalid index [{}], expected range [0, {})", idx, m_playlist.size());
         return;
     }
 
