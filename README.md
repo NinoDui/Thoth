@@ -30,3 +30,8 @@ winget install Git.Git
 winget install Kitware.CMake
 winget install Microsoft.VisualStudio.2022.BuildTools
 ```
+
+## Next TODOs
+[] Audio Recorder for shadowing
+[] ASR / STT (integration of OpenAI Whisper), WER / Levenshtein Distance
+[] Pitch & Prosody Analysis (e.g. Aubio), for F0/Pitch or Energy curves
