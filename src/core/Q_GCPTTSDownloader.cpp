@@ -8,10 +8,6 @@
 Q_GCPTTSDownloader::Q_GCPTTSDownloader(QObject* parent)
     : QObject(parent), m_ttsClient(std::make_shared<GCPTextToSpeechClient>()) {}
 
-Q_GCPTTSDownloader::Q_GCPTTSDownloader(const std::shared_ptr<GCPRuntimeConfig>& config,
-                                       QObject* parent)
-    : QObject(parent), m_ttsClient(std::make_shared<GCPTextToSpeechClient>(config)) {}
-
 void Q_GCPTTSDownloader::download(const std::string& text, const DownloadCallback& callback) {
     // explicitly capture the synchronous client
     // keep it alive even the external asynchnornous calling thread is finished

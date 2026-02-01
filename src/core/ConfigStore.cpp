@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <fstream>
 
+#include "thoth/ConfigKey.h"
 #include "thoth/Logger.h"
 
 namespace fs = std::filesystem;
@@ -45,7 +46,7 @@ void ConfigStore::save() {
     std::ofstream file(m_configPath);
     if (file.is_open()) {
         file << m_config.dump(4);
-        LOG_INFO("Saved {} configuration entries", m_config.size());
+        LOG_DEBUG("Saved {} configuration entries", m_config.size());
     } else {
         LOG_ERROR("Failed to open configuration file when saving: {}", m_configPath.string());
     }
@@ -57,9 +58,19 @@ std::filesystem::path ConfigStore::getTempDir() const {
 }
 
 std::filesystem::path ConfigStore::getConfigDir() const { return m_configPath.parent_path(); }
-
 std::filesystem::path ConfigStore::getCacheDir() const { return getTempDir() / "cache"; }
 std::filesystem::path ConfigStore::getLogDir() const { return getTempDir() / "log"; }
+
+ConfigStore::GoogleTTSConfig ConfigStore::getGoogleTTSConfig() const {
+    std::lock_guard<std::mutex> lock(m_configMutex);
+    return GoogleTTSConfig{
+        .languageCode =
+            m_config.value(thoth::config::KEY_TTS_LANG, thoth::config::DEFAULT_TTS_LANG),
+        .voiceName = m_config.value(thoth::config::KEY_TTS_VOICE, thoth::config::DEFAULT_TTS_VOICE),
+        .audioEncoding = m_config.value(thoth::config::KEY_TTS_AUDIO_ENCODING,
+                                        thoth::config::DEFAULT_TTS_AUDIO_ENCODING),
+    };
+}
 
 std::ostream& operator<<(std::ostream& os, const ConfigStore& config) {
     os << "ConfigStore: {" << std::endl;

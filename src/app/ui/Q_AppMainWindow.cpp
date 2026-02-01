@@ -7,6 +7,8 @@
 
 #include "Q_SettingDialog.h"
 #include "thoth/Logger.h"
+#include "thoth/Q_AudioManager.h"
+#include "thoth/TextParser.h"
 
 Q_AppMainWindow::Q_AppMainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -18,6 +20,8 @@ Q_AppMainWindow::Q_AppMainWindow(QWidget* parent)
     setWindowTitle("Thoth");
     resize(800, 600);
 }
+
+Q_AppMainWindow::~Q_AppMainWindow() = default;
 
 void Q_AppMainWindow::setupUI() {
     QMenu* fileMenu = menuBar()->addMenu("File");
