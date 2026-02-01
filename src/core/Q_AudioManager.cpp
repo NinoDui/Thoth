@@ -8,7 +8,6 @@
 
 Q_AudioManager::Q_AudioManager(QObject* parent)
     : QObject(parent),
-      m_audioCache(std::make_unique<AudioCache>()),
       // objects below are managed by Qt, safe op using 'new'
       m_player(new QMediaPlayer(this)),
       m_audioOutput(new QAudioOutput(this)),
@@ -16,6 +15,11 @@ Q_AudioManager::Q_AudioManager(QObject* parent)
       m_ttsDownloader(new Q_GCPTTSDownloader(this)) {
     m_player->setAudioOutput(m_audioOutput);
     m_delayTimer->setSingleShot(true);
+
+    // Audio Cache is not Qt-based, using smartpointer
+    auto cacheBaseDir = ConfigStore::instance().getCacheDir();
+    auto cacheDir = cacheBaseDir / "audio" / ConfigStore::instance().getGoogleTTSConfig().voiceName;
+    m_audioCache = std::make_unique<AudioCache>(cacheDir);
 
     connect(m_player, &QMediaPlayer::mediaStatusChanged, this,
             [this](QMediaPlayer::MediaStatus status) {
