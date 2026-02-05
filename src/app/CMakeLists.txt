@@ -12,6 +12,8 @@ SET(APP_UI_SRC
     ui/Q_SettingDialog.h
     ui/Q_ShadowingBar.cpp
     ui/Q_ShadowingBar.h
+    ui/Q_PlaybackControlBar.cpp
+    ui/Q_PlaybackControlBar.h
     ui/StyleLoader.h
 )
 SET(APP_RESOURCES

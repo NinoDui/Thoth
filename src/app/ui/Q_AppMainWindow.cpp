@@ -5,18 +5,17 @@
 #include <QMessageBox>
 #include <QStyle>
 
+#include "Q_PlaybackControlBar.h"
 #include "Q_SettingDialog.h"
 #include "Q_ShadowingBar.h"
+#include "thoth/ContentProvider.h"
+#include "thoth/Entity.h"
 #include "thoth/Logger.h"
-#include "thoth/Q_AudioManager.h"
 #include "thoth/Q_AudioRecorder.h"
-#include "thoth/TextParser.h"
+#include "thoth/Q_PlaybackController.h"
 
-Q_AppMainWindow::Q_AppMainWindow(QWidget* parent)
-    : QMainWindow(parent),
-      m_audioManager(std::make_unique<Q_AudioManager>()),
-      m_textParser(std::make_unique<TextParser>()),
-      m_audioRecorder(std::make_unique<Q_AudioRecorder>()) {
+Q_AppMainWindow::Q_AppMainWindow(QWidget* parent) : QMainWindow(parent) {
+    setupControllers();
     setupUI();
     setupConnections();
 
@@ -25,6 +24,12 @@ Q_AppMainWindow::Q_AppMainWindow(QWidget* parent)
 }
 
 Q_AppMainWindow::~Q_AppMainWindow() = default;
+
+void Q_AppMainWindow::setupControllers() {
+    m_textContentProvider = std::make_unique<TextContentProvider>();
+    m_playbackController = std::make_unique<Q_PlaybackController>(m_textContentProvider.get());
+    m_audioRecorder = std::make_unique<Q_AudioRecorder>();
+}
 
 void Q_AppMainWindow::setupUI() {
     QMenu* fileMenu = menuBar()->addMenu("File");
@@ -59,77 +64,34 @@ void Q_AppMainWindow::setupUI() {
     mainLayout->addWidget(m_lblStatus);
     mainLayout->addWidget(m_lstContent, 1);
 
-    // Control Buttons
-    QHBoxLayout* controlLayout = new QHBoxLayout();
-    m_btnPrev = new QPushButton("Prev", this);
-    m_btnPrev->setIcon(style()->standardIcon(QStyle::SP_MediaSkipBackward));
-    m_btnPrev->setToolTip("Previous Sentence");
-
-    m_btnPlay = new QPushButton("Play", this);
-    m_btnPlay->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
-
-    m_btnPause = new QPushButton("Pause", this);
-    m_btnPause->setIcon(style()->standardIcon(QStyle::SP_MediaPause));
-
-    m_btnNext = new QPushButton("Next", this);
-    m_btnNext->setIcon(style()->standardIcon(QStyle::SP_MediaSkipForward));
-    m_btnNext->setToolTip("Next Sentence");
-
-    m_btnLoop = new QPushButton("Single Sentence", this);
-    m_btnLoop->setCheckable(true);
-
-    QLabel* lblDelay = new QLabel("Delay (seconds):", this);
-    m_spinDelay = new QSpinBox(this);
-    m_spinDelay->setRange(0, 5 * 60);
-    m_spinDelay->setSuffix("s");
-    m_spinDelay->setValue(0);
-    m_spinDelay->setFixedWidth(60);
-    m_spinDelay->setToolTip("Delay interval between sentences");
-
-    m_spinIndex = new QSpinBox(this);
-    m_spinIndex->setRange(0, 1000000);
-    m_spinIndex->setValue(0);
-    m_spinIndex->setFixedWidth(60);
-
-    m_btnJump = new QPushButton("Go", this);
-
-    controlLayout->addWidget(m_btnPrev);
-    controlLayout->addWidget(m_btnPlay);
-    controlLayout->addWidget(m_btnPause);
-    controlLayout->addWidget(m_btnNext);
-    controlLayout->addStretch();
-    controlLayout->addWidget(lblDelay);
-    controlLayout->addWidget(m_spinDelay);
-    controlLayout->addWidget(m_btnLoop);
-    controlLayout->addWidget(m_spinIndex);
-    controlLayout->addWidget(m_btnJump);
-
-    mainLayout->addLayout(controlLayout);
+    m_playbackControlBar = new Q_PlaybackControlBar(this);
+    mainLayout->addWidget(m_playbackControlBar);
 
     m_shadowingBar = new Q_ShadowingBar(this);
     mainLayout->addWidget(m_shadowingBar);
 }
 
 void Q_AppMainWindow::setupConnections() {
-    connect(m_btnPlay, &QPushButton::clicked, [this]() { m_audioManager->resume(); });
-    connect(m_btnPause, &QPushButton::clicked, [this]() { m_audioManager->pause(); });
-    connect(m_btnPrev, &QPushButton::clicked, [this]() { m_audioManager->playPrevious(); });
-    connect(m_btnNext, &QPushButton::clicked, [this]() { m_audioManager->playNext(); });
-    connect(m_spinDelay, &QSpinBox::valueChanged,
-            [this](int value) { m_audioManager->setLoopSingle(m_btnLoop->isChecked(), value); });
-
-    connect(m_btnLoop, &QPushButton::toggled,
-            [this](bool checked) { m_audioManager->setLoopSingle(checked); });
-    connect(m_btnJump, &QPushButton::clicked,
-            [this]() { m_audioManager->play(m_spinIndex->value()); });
-
+    // connections with the playbackController (Audio Play)
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPlay,
+            [this]() { m_playbackController->resume(); });
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPause,
+            [this]() { m_playbackController->pause(); });
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPrev,
+            [this]() { m_playbackController->playPrevious(); });
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigNext,
+            [this]() { m_playbackController->playNext(); });
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigLoopModeChanged,
+            [this](bool checked) { m_playbackController->setLoopSingle(checked); });
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigDelayChanged,
+            [this](int value) { m_playbackController->setLoopSingle(value); });
     connect(m_lstContent, &QListWidget::itemDoubleClicked, [this](QListWidgetItem* item) {
-        m_audioManager->play(item->data(Qt::UserRole).toInt());
+        m_playbackController->playSentence(item->data(Qt::UserRole).toInt());
     });
-
-    connect(m_audioManager.get(), &Q_AudioManager::playbackStarted, this,
+    connect(m_playbackController.get(), &Q_PlaybackController::playbackStarted, this,
             &Q_AppMainWindow::onCoreSentenceChanged);
 
+    // connections with the shadowingBar (Shadowing Record)
     connect(m_shadowingBar, &Q_ShadowingBar::sigStartRecording, this, [this]() {
         int idx = m_lstContent->currentRow();
         // TODO: control the path
@@ -157,47 +119,33 @@ void Q_AppMainWindow::onImportFile() {
     }
 
     m_lblStatus->setText("Loading: " + fileName);
-    std::vector<std::string> sentences = m_textParser->parseFile(fileName.toStdString());
-    m_lblStatus->setText("Loaded " + QString::number(sentences.size()) + " sentences");
-    LOG_DEBUG("Parsed {} sentences", sentences.size());
+    Session session = {
+        .title = fileName.toStdString(),
+        .inputMediaPath = fileName.toStdString(),
+    };
+    m_textContentProvider->load(fileName.toStdString(), [this](Session session) {
+        QMetaObject::invokeMethod(this, [this, session]() {
+            m_currentSession = session;
+            updateContentList();
+            m_playbackController->setSession(session);
+            m_lblStatus->setText("Loaded " + QString::number(session.sentences.size()) +
+                                 " sentences");
+            LOG_INFO("Loaded {} sentences", session.sentences.size());
+        });
+    });
+}
 
+void Q_AppMainWindow::updateContentList() {
     m_lstContent->clear();
-    m_lastHighlightedIdx = -1;
-    m_audioManager->reset();
-
-    for (size_t i = 0; i < sentences.size(); ++i) {
-        QString text = QString("[%1] %2").arg(i + 1).arg(QString::fromStdString(sentences[i]));
+    for (size_t i = 0; i < m_currentSession.sentences.size(); ++i) {
+        QString text = QString("[%1] %2").arg(i + 1).arg(QString::fromStdString(m_currentSession.sentences[i].text));
         QListWidgetItem* item = new QListWidgetItem(text);
-        item->setData(Qt::UserRole, (int)i);
+        item->setData(Qt::UserRole, static_cast<int>(i));
         m_lstContent->addItem(item);
     }
-    m_audioManager->setPlaylist(sentences);
 }
 
 void Q_AppMainWindow::onExportAudio() {}
-
-void Q_AppMainWindow::onPlayClicked() {
-    if (m_audioManager->isPlaying()) {
-        m_audioManager->pause();
-    } else {
-        m_audioManager->resume();
-    }
-}
-
-void Q_AppMainWindow::onPauseClicked() { m_audioManager->pause(); }
-
-void Q_AppMainWindow::onPrevClicked() { m_audioManager->playPrevious(); }
-
-void Q_AppMainWindow::onNextClicked() { m_audioManager->playNext(); }
-
-void Q_AppMainWindow::onLoopToggled(bool checked) { m_audioManager->setLoopSingle(checked); }
-
-void Q_AppMainWindow::onJumpToSentence(int idx) { m_audioManager->play(idx); }
-
-void Q_AppMainWindow::onCoreStateChanged(QMediaPlayer::PlaybackState state) {
-    m_btnPlay->setVisible(state == QMediaPlayer::StoppedState);
-    m_btnPause->setVisible(state == QMediaPlayer::PlayingState);
-}
 
 void Q_AppMainWindow::onCoreSentenceChanged(int idx) {
     if (idx < 0 || idx >= m_lstContent->count()) return;

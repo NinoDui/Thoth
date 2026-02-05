@@ -1,8 +1,8 @@
 #include "internal/AudioCache.h"
-#include "internal/ContentProvider.h"
 #include "internal/Q_GCPTTSDownloader.h"
 #include "internal/TextParser.h"
 #include "thoth/ConfigStore.h"
+#include "thoth/ContentProvider.h"
 #include "thoth/Logger.h"
 
 TextContentProvider::TextContentProvider()
