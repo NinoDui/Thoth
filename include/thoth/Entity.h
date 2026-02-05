@@ -26,7 +26,7 @@ struct Sentence {
 
 class Session {
    public:
-    ~Session();
+    ~Session() = default;
 
     std::string id;
     std::string title;

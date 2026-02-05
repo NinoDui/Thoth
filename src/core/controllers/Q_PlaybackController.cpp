@@ -5,7 +5,7 @@
 #include <QUrl>
 #include <iostream>
 
-#include "internal/ContentProvider.h"
+#include "thoth/ContentProvider.h"
 
 Q_PlaybackController::Q_PlaybackController(QObject* parent)
     : QObject(parent),
@@ -17,7 +17,23 @@ Q_PlaybackController::Q_PlaybackController(QObject* parent)
     m_delayTimer->setSingleShot(true);
 
     m_contentProvider = std::make_unique<TextContentProvider>();
+    setupConnections();
+}
 
+Q_PlaybackController::Q_PlaybackController(IContentProvider* contentProvider, QObject* parent)
+    : QObject(parent),
+      m_contentProvider(contentProvider),
+      m_player(new QMediaPlayer(this)),
+      m_audioOutput(new QAudioOutput(this)),
+      m_delayTimer(new QTimer(this)) {
+    m_player->setAudioOutput(m_audioOutput.get());
+    m_delayTimer->setSingleShot(true);
+    setupConnections();
+}
+
+Q_PlaybackController::~Q_PlaybackController() { stop(); }
+
+void Q_PlaybackController::setupConnections() {   
     // when delay timer timeout, let _onLoopTimerTimeout be called
     connect(m_delayTimer.get(), &QTimer::timeout, this, &Q_PlaybackController::_onLoopTimerTimeout);
     // when media status changed, let _onMediaStatusChanged be called
@@ -27,8 +43,6 @@ Q_PlaybackController::Q_PlaybackController(QObject* parent)
     connect(m_player.get(), &QMediaPlayer::errorOccurred, this,
             &Q_PlaybackController::_onErrorOccurred);
 }
-
-Q_PlaybackController::~Q_PlaybackController() { stop(); }
 
 void Q_PlaybackController::setSession(const Session& session) {
     stop();

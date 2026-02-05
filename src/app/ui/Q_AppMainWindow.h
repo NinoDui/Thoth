@@ -10,8 +10,11 @@
 #include <QVBoxLayout>
 #include <memory>
 
-class Q_AudioManager;
-class TextParser;
+#include "thoth/Entity.h"
+
+class Q_PlaybackController;
+class Q_PlaybackControlBar;
+class TextContentProvider;
 class Q_ShadowingBar;
 class Q_AudioRecorder;
 
@@ -25,42 +28,25 @@ class Q_AppMainWindow : public QMainWindow {
    private slots:
     void onImportFile();
     void onExportAudio();
-
-    void onPlayClicked();
-    void onPauseClicked();
-    void onPrevClicked();
-    void onNextClicked();
-    void onLoopToggled(bool checked);
-    void onJumpToSentence(int idx);
-
     void onCoreSentenceChanged(int idx);
-    void onCoreStateChanged(QMediaPlayer::PlaybackState state);
 
    private:
     void setupUI();
     void setupConnections();
+    void setupControllers();
+
+    void updateContentList();
 
     QWidget* m_centralWidget;
-
     QLabel* m_lblStatus;
     QListWidget* m_lstContent;
-
-    QPushButton* m_btnPlay;
-    QPushButton* m_btnPrev;
-    QPushButton* m_btnPause;
-    QPushButton* m_btnNext;
-    QPushButton* m_btnLoop;
-
-    QSpinBox* m_spinIndex;
-    QPushButton* m_btnJump;
-
-    QSpinBox* m_spinDelay;
-
+    Q_PlaybackControlBar* m_playbackControlBar;
     Q_ShadowingBar* m_shadowingBar;
 
     int m_lastHighlightedIdx = -1;
 
-    std::unique_ptr<Q_AudioManager> m_audioManager;
-    std::unique_ptr<TextParser> m_textParser;
+    std::unique_ptr<Q_PlaybackController> m_playbackController;
     std::unique_ptr<Q_AudioRecorder> m_audioRecorder;
+    std::unique_ptr<TextContentProvider> m_textContentProvider;
+    Session m_currentSession;
 };

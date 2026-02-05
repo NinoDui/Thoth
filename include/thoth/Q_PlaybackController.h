@@ -66,6 +66,7 @@ class Q_PlaybackController : public QObject {
    private:
     void _Q_play(const std::filesystem::path& localPath);
     void _fetchNext(int start_idx);
+    void setupConnections();
 
     std::unique_ptr<QMediaPlayer> m_player;
     std::unique_ptr<QAudioOutput> m_audioOutput;
