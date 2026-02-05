@@ -10,11 +10,11 @@
 
 struct WAVHeader;
 
-class Q_UserAudioRecorder : public QObject {
+class Q_AudioRecorder : public QObject {
     Q_OBJECT
    public:
-    explicit Q_UserAudioRecorder(QObject* parent = nullptr);
-    ~Q_UserAudioRecorder();
+    explicit Q_AudioRecorder(QObject* parent = nullptr);
+    ~Q_AudioRecorder();
 
     bool startRecording(const std::filesystem::path& filePath);
     void stopRecording();

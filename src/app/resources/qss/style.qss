@@ -22,3 +22,61 @@ QListWidget#sentenceList::item:selected {
     color: black;
     border-left: 4px solid #2196F3;
 }
+
+/* --- Shadowing Bar --- */
+Q_ShadowingBar {
+    background-color: #f5f5f7; 
+    border-top: 1px solid #e0e0e0;
+}
+
+/* --- Record Button --- */
+QPushButton#btnRecord {
+    background-color: #ffffff;
+    border: 2px solid #ff3b30;
+    border-radius: 20px;
+    qproperty-iconSize: 0px;
+    background-image: none;
+}
+
+/* 核心技巧：使用伪状态或动态属性改变样式 */
+/* 状态 A: 未录音 (空心圆) */
+QPushButton#btnRecord[recording="false"] {
+    background-color: transparent;
+}
+QPushButton#btnRecord[recording="false"]:hover {
+    background-color: #ffe5e5;
+}
+
+/* 状态 B: 录音中 (实心红矩形，表示 Stop) */
+QPushButton#btnRecord[recording="true"] {
+    background-color: #ff3b30;
+    border: 2px solid #ff3b30;
+    border-radius: 5px; 
+}
+
+/* --- Visualizer --- */
+QProgressBar#visualizer {
+    border: none;
+    background-color: #e5e5ea;
+    border-radius: 3px;
+}
+QProgressBar#visualizer::chunk {
+    background-color: #34c759;
+    border-radius: 3px;
+}
+
+/* --- btnPlayUserAudio --- */
+QPushButton#btnPlayUserAudio {
+    background-color: transparent;
+    border: 1px solid #007aff;
+    color: #007aff;
+    border-radius: 4px;
+    padding: 4px 12px;
+}
+QPushButton#btnPlayUserAudio:disabled {
+    border-color: #c7c7cc;
+    color: #c7c7cc;
+}
+QPushButton#btnPlayUserAudio:hover {
+    background-color: #e5f1ff;
+}

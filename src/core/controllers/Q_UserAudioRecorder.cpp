@@ -1,15 +1,14 @@
-#include "thoth/Q_UserAudioRecorder.h"
-
 #include <QDebug>
 
-#include "internal/Entity.h"
+#include "internal/InternalEntity.h"
 #include "thoth/ConfigKey.h"
 #include "thoth/ConfigStore.h"
 #include "thoth/Logger.h"
+#include "thoth/Q_AudioRecorder.h"
 
-Q_UserAudioRecorder::Q_UserAudioRecorder(QObject* parent) : QObject(parent) { initAudio(); }
+Q_AudioRecorder::Q_AudioRecorder(QObject* parent) : QObject(parent) { initAudio(); }
 
-Q_UserAudioRecorder::~Q_UserAudioRecorder() { stopRecording(); }
+Q_AudioRecorder::~Q_AudioRecorder() { stopRecording(); }
 
 uint16_t QAudioSampleFormatToBits(QAudioFormat::SampleFormat format) {
     switch (format) {
@@ -26,7 +25,7 @@ uint16_t QAudioSampleFormatToBits(QAudioFormat::SampleFormat format) {
     }
 }
 
-void Q_UserAudioRecorder::initAudio() {
+void Q_AudioRecorder::initAudio() {
     // By default, use 16kHz, Mono, 16-bit, which is compatiable to OpenAI Whisper
     m_audioFormat.setSampleRate(
         ConfigStore::instance()
@@ -61,7 +60,7 @@ void Q_UserAudioRecorder::initAudio() {
     m_audioSource = std::make_unique<QAudioSource>(defaultDevice, m_audioFormat);
 }
 
-bool Q_UserAudioRecorder::startRecording(const std::filesystem::path& filePath) {
+bool Q_AudioRecorder::startRecording(const std::filesystem::path& filePath) {
     if (m_audioSource->state() == QAudio::ActiveState) {
         return false;
     }
@@ -84,11 +83,11 @@ bool Q_UserAudioRecorder::startRecording(const std::filesystem::path& filePath) 
         return false;
     }
 
-    connect(m_audioStream, &QIODevice::readyRead, this, &Q_UserAudioRecorder::onReadyRecord);
+    connect(m_audioStream, &QIODevice::readyRead, this, &Q_AudioRecorder::onReadyRecord);
     return true;
 }
 
-void Q_UserAudioRecorder::stopRecording() {
+void Q_AudioRecorder::stopRecording() {
     if (!m_audioSource || m_audioSource->state() == QAudio::StoppedState) {
         return;
     }
@@ -116,18 +115,18 @@ void Q_UserAudioRecorder::stopRecording() {
     }
 }
 
-bool Q_UserAudioRecorder::isRecording() const {
+bool Q_AudioRecorder::isRecording() const {
     return m_audioSource && m_audioSource->state() == QAudio::ActiveState;
 }
 
-std::optional<std::filesystem::path> Q_UserAudioRecorder::lastRecordingFilePath() const {
+std::optional<std::filesystem::path> Q_AudioRecorder::lastRecordingFilePath() const {
     if (m_audioFile && m_audioFile->isOpen()) {
         return std::filesystem::path(m_audioFile->fileName().toStdString());
     }
     return std::nullopt;
 }
 
-void Q_UserAudioRecorder::onReadyRecord() {
+void Q_AudioRecorder::onReadyRecord() {
     if (!m_audioStream || !m_audioFile) return;
 
     QByteArray buffer = m_audioStream->readAll();
@@ -150,7 +149,7 @@ constexpr double calNormFactor() {
     return static_cast<double>(1LL << (sizeof(T) * 8 - 1));
 }
 
-float Q_UserAudioRecorder::calculateRMS(const QByteArray& buffer) {
+float Q_AudioRecorder::calculateRMS(const QByteArray& buffer) {
     const int16_t* samples = reinterpret_cast<const int16_t*>(buffer.constData());
     int sampleCnt = buffer.size() / sizeof(int16_t);
 
