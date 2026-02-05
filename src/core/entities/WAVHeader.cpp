@@ -1,4 +1,4 @@
-#include "internal/Entity.h"
+#include "internal/InternalEntity.h"
 
 WAVHeader WAVHeader::create(uint32_t sampleRate, uint16_t numChannels, uint16_t bitsPerSample,
                             uint32_t dataSize) {

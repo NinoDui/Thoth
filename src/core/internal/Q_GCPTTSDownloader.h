@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "gcp.h"
+#include "internal/GCP.h"
 
 /**
  * @brief The Q_GCPTTSDownloader class is a Qt wrapper for the GCPTextToSpeechClient class.

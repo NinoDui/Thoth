@@ -12,6 +12,8 @@
 
 class Q_AudioManager;
 class TextParser;
+class Q_ShadowingBar;
+class Q_AudioRecorder;
 
 class Q_AppMainWindow : public QMainWindow {
     Q_OBJECT
@@ -54,8 +56,11 @@ class Q_AppMainWindow : public QMainWindow {
 
     QSpinBox* m_spinDelay;
 
+    Q_ShadowingBar* m_shadowingBar;
+
     int m_lastHighlightedIdx = -1;
 
     std::unique_ptr<Q_AudioManager> m_audioManager;
     std::unique_ptr<TextParser> m_textParser;
+    std::unique_ptr<Q_AudioRecorder> m_audioRecorder;
 };

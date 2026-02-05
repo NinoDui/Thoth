@@ -6,14 +6,17 @@
 #include <QStyle>
 
 #include "Q_SettingDialog.h"
+#include "Q_ShadowingBar.h"
 #include "thoth/Logger.h"
 #include "thoth/Q_AudioManager.h"
+#include "thoth/Q_AudioRecorder.h"
 #include "thoth/TextParser.h"
 
 Q_AppMainWindow::Q_AppMainWindow(QWidget* parent)
     : QMainWindow(parent),
       m_audioManager(std::make_unique<Q_AudioManager>()),
-      m_textParser(std::make_unique<TextParser>()) {
+      m_textParser(std::make_unique<TextParser>()),
+      m_audioRecorder(std::make_unique<Q_AudioRecorder>()) {
     setupUI();
     setupConnections();
 
@@ -102,6 +105,9 @@ void Q_AppMainWindow::setupUI() {
     controlLayout->addWidget(m_btnJump);
 
     mainLayout->addLayout(controlLayout);
+
+    m_shadowingBar = new Q_ShadowingBar(this);
+    mainLayout->addWidget(m_shadowingBar);
 }
 
 void Q_AppMainWindow::setupConnections() {
@@ -123,6 +129,22 @@ void Q_AppMainWindow::setupConnections() {
 
     connect(m_audioManager.get(), &Q_AudioManager::playbackStarted, this,
             &Q_AppMainWindow::onCoreSentenceChanged);
+
+    connect(m_shadowingBar, &Q_ShadowingBar::sigStartRecording, this, [this]() {
+        int idx = m_lstContent->currentRow();
+        // TODO: control the path
+    });
+    connect(m_shadowingBar, &Q_ShadowingBar::sigStopRecording, this, [this]() {
+        m_audioRecorder->stopRecording();
+        m_shadowingBar->onRecordingFinished();
+    });
+    connect(m_audioRecorder.get(), &Q_AudioRecorder::updateAmplitude, m_shadowingBar,
+            &Q_ShadowingBar::setAmplitude);
+    connect(m_audioRecorder.get(), &Q_AudioRecorder::errorOccurred, this,
+            [this](const QString& errorMessage) {
+                LOG_ERROR("Recorder error: {}", errorMessage.toStdString());
+                m_shadowingBar->reset();
+            });
 }
 
 void Q_AppMainWindow::onImportFile() {
