@@ -13,6 +13,9 @@ class Q_PlaybackControlBar : public QWidget {
    public:
     explicit Q_PlaybackControlBar(QWidget* parent = nullptr);
 
+    bool loopMode() const;
+    int loopDelay() const;
+
    signals:
     void sigPlay();
     void sigPause();
@@ -36,4 +39,6 @@ class Q_PlaybackControlBar : public QWidget {
     QSpinBox* m_spinDelay;
 
     bool m_isPlaying = false;
+    bool m_singleLoop = false;
+    int m_loopDelay = 0;
 };

@@ -1,14 +1,32 @@
+#include "thoth/Q_RecordController.h"
+
 #include <QDebug>
 
 #include "internal/InternalEntity.h"
+#include "internal/Timer.h"
 #include "thoth/ConfigKey.h"
 #include "thoth/ConfigStore.h"
+#include "thoth/Entity.h"
 #include "thoth/Logger.h"
-#include "thoth/Q_AudioRecorder.h"
 
-Q_AudioRecorder::Q_AudioRecorder(QObject* parent) : QObject(parent) { initAudio(); }
+Q_RecordController::Q_RecordController(QObject* parent) : QObject(parent) {
+    m_recordRootDir =
+        ConfigStore::instance().getCacheDir() / "record" / thoth::internal::getCurrentTimestamp();
+    if (!std::filesystem::exists(m_recordRootDir)) {
+        std::filesystem::create_directories(m_recordRootDir);
+    }
+    initAudio();
+}
 
-Q_AudioRecorder::~Q_AudioRecorder() { stopRecording(); }
+Q_RecordController::Q_RecordController(const std::filesystem::path& recordRootDir, QObject* parent)
+    : QObject(parent) {
+    m_recordRootDir = recordRootDir;
+    if (!std::filesystem::exists(m_recordRootDir)) {
+        std::filesystem::create_directories(m_recordRootDir);
+    }
+    initAudio();
+}
+Q_RecordController::~Q_RecordController() { stopRecording(); }
 
 uint16_t QAudioSampleFormatToBits(QAudioFormat::SampleFormat format) {
     switch (format) {
@@ -25,7 +43,7 @@ uint16_t QAudioSampleFormatToBits(QAudioFormat::SampleFormat format) {
     }
 }
 
-void Q_AudioRecorder::initAudio() {
+void Q_RecordController::initAudio() {
     // By default, use 16kHz, Mono, 16-bit, which is compatiable to OpenAI Whisper
     m_audioFormat.setSampleRate(
         ConfigStore::instance()
@@ -46,10 +64,10 @@ void Q_AudioRecorder::initAudio() {
                                .getValue<uint16_t>(thoth::config::KEY_AUDIO_RECORDER_SAMPLE_FORMAT)
                                .value_or(thoth::config::DEFAULT_AUDIO_RECORDER_SAMPLE_FORMAT)));
 
-    QAudioDevice defaultDevice = QMediaDevices::defaultAudioOutput();
+    QAudioDevice defaultDevice = QMediaDevices::defaultAudioInput();
     if (!defaultDevice.isFormatSupported(m_audioFormat)) {
         LOG_ERROR(
-            "Default audio output device does not support the requested format, trying the nearest "
+            "Default audio input device does not support the requested format, trying the nearest "
             "format.");
         m_audioFormat = defaultDevice.preferredFormat();
         LOG_WARN("Using the nearest format: {}kHz, {}ch, {}bit", m_audioFormat.sampleRate(),
@@ -60,15 +78,28 @@ void Q_AudioRecorder::initAudio() {
     m_audioSource = std::make_unique<QAudioSource>(defaultDevice, m_audioFormat);
 }
 
-bool Q_AudioRecorder::startRecording(const std::filesystem::path& filePath) {
+bool Q_RecordController::startRecording(RecordedSentence& sentence) {
     if (m_audioSource->state() == QAudio::ActiveState) {
         return false;
     }
 
-    m_audioFile = std::make_unique<QFile>(QString::fromStdString(filePath.string()));
-    if (!m_audioFile->open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        LOG_ERROR("Failed to open file {} for recording", filePath.string());
-        emit errorOccurred("Failed to create recording file");
+    try {
+        sentence.localShadowingPath = _path(sentence);
+        QString qPath;
+#ifdef _WIN32
+        qPath = QString::fromStdWString(sentence.localShadowingPath.wstring());
+#else
+        qPath = QString::fromStdString(sentence.localShadowingPath.string());
+#endif
+        m_audioFile = std::make_unique<QFile>(qPath);
+        if (!m_audioFile->open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            LOG_ERROR("Failed to open file {} for recording", sentence.localShadowingPath.string());
+            emit errorOccurred("Failed to create recording file");
+            return false;
+        }
+    } catch (const std::exception& e) {
+        LOG_ERROR("Failed to start recording: {}", e.what());
+        emit errorOccurred("Failed to start recording: " + QString::fromStdString(e.what()));
         return false;
     }
 
@@ -83,21 +114,21 @@ bool Q_AudioRecorder::startRecording(const std::filesystem::path& filePath) {
         return false;
     }
 
-    connect(m_audioStream, &QIODevice::readyRead, this, &Q_AudioRecorder::onReadyRecord);
+    connect(m_audioStream, &QIODevice::readyRead, this, &Q_RecordController::onReadyRecord);
     return true;
 }
 
-void Q_AudioRecorder::stopRecording() {
+void Q_RecordController::stopRecording() {
     if (!m_audioSource || m_audioSource->state() == QAudio::StoppedState) {
         return;
     }
 
-    m_audioSource->stop();
     if (m_audioStream) {
         // disconnect and avoid remaining data envoking the slot
         disconnect(m_audioStream, &QIODevice::readyRead, this, nullptr);
-        m_audioStream = nullptr;
     }
+    m_audioSource->stop();
+    m_audioStream = nullptr;
 
     // back-writing the actual size to WAV Header
     if (m_audioFile && m_audioFile->isOpen()) {
@@ -115,18 +146,18 @@ void Q_AudioRecorder::stopRecording() {
     }
 }
 
-bool Q_AudioRecorder::isRecording() const {
+bool Q_RecordController::isRecording() const {
     return m_audioSource && m_audioSource->state() == QAudio::ActiveState;
 }
 
-std::optional<std::filesystem::path> Q_AudioRecorder::lastRecordingFilePath() const {
+std::optional<std::filesystem::path> Q_RecordController::lastRecordingFilePath() const {
     if (m_audioFile && m_audioFile->isOpen()) {
         return std::filesystem::path(m_audioFile->fileName().toStdString());
     }
     return std::nullopt;
 }
 
-void Q_AudioRecorder::onReadyRecord() {
+void Q_RecordController::onReadyRecord() {
     if (!m_audioStream || !m_audioFile) return;
 
     QByteArray buffer = m_audioStream->readAll();
@@ -141,6 +172,10 @@ void Q_AudioRecorder::onReadyRecord() {
     emit updateAmplitude(level);
 }
 
+std::filesystem::path Q_RecordController::_path(const RecordedSentence& sentence) {
+    return m_recordRootDir / (sentence.id + ".wav");
+}
+
 template <typename T>
 constexpr double calNormFactor() {
     // for signed-number of n bits, the range is [-2^(n-1), 2^(n-1)-1]
@@ -149,9 +184,9 @@ constexpr double calNormFactor() {
     return static_cast<double>(1LL << (sizeof(T) * 8 - 1));
 }
 
-float Q_AudioRecorder::calculateRMS(const QByteArray& buffer) {
+float Q_RecordController::calculateRMS(const QByteArray& buffer) {
     const int16_t* samples = reinterpret_cast<const int16_t*>(buffer.constData());
-    int sampleCnt = buffer.size() / sizeof(int16_t);
+    uint32_t sampleCnt = buffer.size() / sizeof(int16_t);
 
     if (sampleCnt <= 0) return 0.0f;
 

@@ -2,7 +2,7 @@
 
 #include <filesystem>
 
-#include "thoth/TextParser.h"
+#include "internal/TextParser.h"
 
 namespace fs = std::filesystem;
 

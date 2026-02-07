@@ -16,7 +16,7 @@ class Q_PlaybackController;
 class Q_PlaybackControlBar;
 class TextContentProvider;
 class Q_ShadowingBar;
-class Q_AudioRecorder;
+class Q_RecordController;
 
 class Q_AppMainWindow : public QMainWindow {
     Q_OBJECT
@@ -46,7 +46,8 @@ class Q_AppMainWindow : public QMainWindow {
     int m_lastHighlightedIdx = -1;
 
     std::unique_ptr<Q_PlaybackController> m_playbackController;
-    std::unique_ptr<Q_AudioRecorder> m_audioRecorder;
+    std::unique_ptr<Q_RecordController> m_recordController;
     std::unique_ptr<TextContentProvider> m_textContentProvider;
+    
     Session m_currentSession;
 };

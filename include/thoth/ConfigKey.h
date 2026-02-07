@@ -37,4 +37,6 @@ constexpr const char* KEY_AUDIO_RECORDER_BUFFER_SIZE = "audio/recorder_buffer_si
 constexpr const uint32_t DEFAULT_AUDIO_RECORDER_BUFFER_SIZE = 1024;
 constexpr const char* KEY_AUDIO_RECORDER_RMS_STEP = "audio/recorder_rms_step";
 constexpr const uint8_t DEFAULT_AUDIO_RECORDER_RMS_STEP = 8;
+
+constexpr const char* DEFAULT_TIME_FORMAT = "%Y%m%d%H%M%S";
 }  // namespace thoth::config

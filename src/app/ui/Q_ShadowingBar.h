@@ -5,6 +5,7 @@
 class QPushButton;
 class QProgressBar;
 class QHBoxLayout;
+class Q_RecordController;
 
 class Q_ShadowingBar : public QWidget {
     Q_OBJECT
@@ -20,7 +21,7 @@ class Q_ShadowingBar : public QWidget {
     void onRecordingFinished();
 
    signals:
-    // signals to the parent widget
+    // signals to the parent widget, Q_AppMainWindow
     void sigStartRecording();
     void sigStopRecording();
     void sigPlayUserAudio();

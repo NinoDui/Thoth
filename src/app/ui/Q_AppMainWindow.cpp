@@ -11,8 +11,8 @@
 #include "thoth/ContentProvider.h"
 #include "thoth/Entity.h"
 #include "thoth/Logger.h"
-#include "thoth/Q_AudioRecorder.h"
 #include "thoth/Q_PlaybackController.h"
+#include "thoth/Q_RecordController.h"
 
 Q_AppMainWindow::Q_AppMainWindow(QWidget* parent) : QMainWindow(parent) {
     setupControllers();
@@ -28,7 +28,7 @@ Q_AppMainWindow::~Q_AppMainWindow() = default;
 void Q_AppMainWindow::setupControllers() {
     m_textContentProvider = std::make_unique<TextContentProvider>();
     m_playbackController = std::make_unique<Q_PlaybackController>(m_textContentProvider.get());
-    m_audioRecorder = std::make_unique<Q_AudioRecorder>();
+    m_recordController = std::make_unique<Q_RecordController>();
 }
 
 void Q_AppMainWindow::setupUI() {
@@ -81,10 +81,12 @@ void Q_AppMainWindow::setupConnections() {
             [this]() { m_playbackController->playPrevious(); });
     connect(m_playbackControlBar, &Q_PlaybackControlBar::sigNext,
             [this]() { m_playbackController->playNext(); });
-    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigLoopModeChanged,
-            [this](bool checked) { m_playbackController->setLoopSingle(checked); });
-    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigDelayChanged,
-            [this](int value) { m_playbackController->setLoopSingle(value); });
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigLoopModeChanged, [this](bool checked) {
+        m_playbackController->setLoopSingle(checked, m_playbackControlBar->loopDelay());
+    });
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigDelayChanged, [this](int value) {
+        m_playbackController->setLoopSingle(m_playbackControlBar->loopMode(), value);
+    });
     connect(m_lstContent, &QListWidget::itemDoubleClicked, [this](QListWidgetItem* item) {
         m_playbackController->playSentence(item->data(Qt::UserRole).toInt());
     });
@@ -94,15 +96,19 @@ void Q_AppMainWindow::setupConnections() {
     // connections with the shadowingBar (Shadowing Record)
     connect(m_shadowingBar, &Q_ShadowingBar::sigStartRecording, this, [this]() {
         int idx = m_lstContent->currentRow();
-        // TODO: control the path
+        if (idx < 0 || idx >= m_lstContent->count()) {
+            LOG_WARN("Invalid index [{}], expected range [0, {})", idx, m_lstContent->count());
+            return;
+        }
+        m_recordController->startRecording(m_currentSession.recordedSentences->at(idx));
     });
     connect(m_shadowingBar, &Q_ShadowingBar::sigStopRecording, this, [this]() {
-        m_audioRecorder->stopRecording();
+        m_recordController->stopRecording();
         m_shadowingBar->onRecordingFinished();
     });
-    connect(m_audioRecorder.get(), &Q_AudioRecorder::updateAmplitude, m_shadowingBar,
+    connect(m_recordController.get(), &Q_RecordController::updateAmplitude, m_shadowingBar,
             &Q_ShadowingBar::setAmplitude);
-    connect(m_audioRecorder.get(), &Q_AudioRecorder::errorOccurred, this,
+    connect(m_recordController.get(), &Q_RecordController::errorOccurred, this,
             [this](const QString& errorMessage) {
                 LOG_ERROR("Recorder error: {}", errorMessage.toStdString());
                 m_shadowingBar->reset();
@@ -119,18 +125,24 @@ void Q_AppMainWindow::onImportFile() {
     }
 
     m_lblStatus->setText("Loading: " + fileName);
-    Session session = {
-        .title = fileName.toStdString(),
-        .inputMediaPath = fileName.toStdString(),
-    };
     m_textContentProvider->load(fileName.toStdString(), [this](Session session) {
-        QMetaObject::invokeMethod(this, [this, session]() {
-            m_currentSession = session;
-            updateContentList();
-            m_playbackController->setSession(session);
-            m_lblStatus->setText("Loaded " + QString::number(session.sentences.size()) +
+        // A new session is created by the content provider
+        // passed to this lambda callback via value copy
+        // as the reference pass is not allowed in cross-thread async calls
+        // QMetaObject::invokeMethod is packing the lambda function to a task (QMetaCallEvent) and
+        // dispatch it to the main thread
+        QMetaObject::invokeMethod(this, [this, session = std::move(session)]() {
+            m_currentSession = std::move(session);
+            m_currentSession.recordedSentences = std::vector<RecordedSentence>();
+            for (const auto& sentence : m_currentSession.sentences) {
+                m_currentSession.recordedSentences->push_back(
+                    RecordedSentence{sentence, std::filesystem::path(), 0.0});
+            }
+            m_playbackController->setSession(m_currentSession);
+            m_lblStatus->setText("Loaded " + QString::number(m_currentSession.sentences.size()) +
                                  " sentences");
-            LOG_INFO("Loaded {} sentences", session.sentences.size());
+            updateContentList();
+            LOG_INFO("Loaded {} sentences", m_currentSession.sentences.size());
         });
     });
 }
@@ -138,7 +150,8 @@ void Q_AppMainWindow::onImportFile() {
 void Q_AppMainWindow::updateContentList() {
     m_lstContent->clear();
     for (size_t i = 0; i < m_currentSession.sentences.size(); ++i) {
-        QString text = QString("[%1] %2").arg(i + 1).arg(QString::fromStdString(m_currentSession.sentences[i].text));
+        QString text = QString("[%1] %2").arg(i + 1).arg(
+            QString::fromStdString(m_currentSession.sentences[i].text));
         QListWidgetItem* item = new QListWidgetItem(text);
         item->setData(Qt::UserRole, static_cast<int>(i));
         m_lstContent->addItem(item);

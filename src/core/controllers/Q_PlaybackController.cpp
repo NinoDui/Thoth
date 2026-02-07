@@ -33,7 +33,7 @@ Q_PlaybackController::Q_PlaybackController(IContentProvider* contentProvider, QO
 
 Q_PlaybackController::~Q_PlaybackController() { stop(); }
 
-void Q_PlaybackController::setupConnections() {   
+void Q_PlaybackController::setupConnections() {
     // when delay timer timeout, let _onLoopTimerTimeout be called
     connect(m_delayTimer.get(), &QTimer::timeout, this, &Q_PlaybackController::_onLoopTimerTimeout);
     // when media status changed, let _onMediaStatusChanged be called
@@ -111,10 +111,11 @@ void Q_PlaybackController::_Q_play(const std::filesystem::path& localPath) {
 }
 
 void Q_PlaybackController::_fetchNext(int start_idx) {
-    for (int i = 1; start_idx + i < m_currentSession.sentences.size() && i <= windows_size; ++i) {
+    for (size_t i = 1; start_idx + i < m_currentSession.sentences.size() && i <= windows_size;
+         ++i) {
         int next_idx = start_idx + i;
         Sentence& sentence = m_currentSession.sentences[next_idx];
-        m_contentProvider->prepareAudio(sentence, [this, next_idx](bool success) {
+        m_contentProvider->prepareAudio(sentence, [next_idx](bool success) {
             if (!success) {
                 LOG_ERROR("Failed to prefetch audio for sentence [{}]", next_idx);
                 return;
@@ -185,14 +186,16 @@ void Q_PlaybackController::_onMediaStatusChanged(QMediaPlayer::MediaStatus statu
     if (status == QMediaPlayer::EndOfMedia) {
         emit playbackFinished(m_currentIdx);
 
-        if (m_singleLoop) {
-            if (m_loopDelaySeconds > 0) {
-                m_delayTimer->start(m_loopDelaySeconds * 1000);
-            } else {
-                _onLoopTimerTimeout();
-            }
+        if (!m_singleLoop) {
+            m_currentIdx += 1;
+        }
+
+        if (m_loopDelaySeconds > 0) {
+            // delay between current and the next play
+            m_delayTimer->start(m_loopDelaySeconds * 1000);
         } else {
-            playNext();
+            // no delay, play the next sentence immediately
+            _onLoopTimerTimeout();
         }
     }
 }

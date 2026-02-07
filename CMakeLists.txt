@@ -12,16 +12,21 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    # avoid Unicode character encoding issues in Windows
 if(MSVC)
-    add_compile_options("/utf-8")
+    add_compile_options(/utf-8 /W4)
+    add_link_options(/ignore:4099)
     # add_compile_options("/fsanitize=address")
+else()
+    add_compile_options(-Wall -Wextra -pedantic)
 endif()
 
 # Dependencies
-find_package(Qt6 COMPONENTS Core Concurrent Widgets Network Multimedia REQUIRED)
+find_package(Qt6 COMPONENTS Core Concurrent Widgets Network Multimedia Test REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(google_cloud_cpp_texttospeech REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(GTest CONFIG REQUIRED)
+
+enable_testing()
 
 add_subdirectory(src/core)
 add_subdirectory(src/app)
