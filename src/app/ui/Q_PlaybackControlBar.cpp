@@ -59,8 +59,14 @@ void Q_PlaybackControlBar::setupConnections() {
             emit sigPlay();
     });
 
-    connect(m_chkLoop, &QCheckBox::toggled, this, &Q_PlaybackControlBar::sigLoopModeChanged);
-    connect(m_spinDelay, &QSpinBox::valueChanged, this, &Q_PlaybackControlBar::sigDelayChanged);
+    connect(m_chkLoop, &QCheckBox::toggled, [this](bool checked) {
+        m_singleLoop = checked;
+        emit sigLoopModeChanged(checked);
+    });
+    connect(m_spinDelay, &QSpinBox::valueChanged, [this](int value) {
+        m_loopDelay = value;
+        emit sigDelayChanged(value);
+    });
 }
 
 void Q_PlaybackControlBar::setPlayingState(bool isPlaying) {
@@ -68,3 +74,6 @@ void Q_PlaybackControlBar::setPlayingState(bool isPlaying) {
     m_btnPlayPause->setIcon(
         style()->standardIcon(m_isPlaying ? QStyle::SP_MediaPause : QStyle::SP_MediaPlay));
 }
+
+bool Q_PlaybackControlBar::loopMode() const { return m_singleLoop; }
+int Q_PlaybackControlBar::loopDelay() const { return m_loopDelay; }

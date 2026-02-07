@@ -9,14 +9,17 @@
 #include <optional>
 
 struct WAVHeader;
+struct RecordedSentence;
 
-class Q_AudioRecorder : public QObject {
+class Q_RecordController : public QObject {
     Q_OBJECT
    public:
-    explicit Q_AudioRecorder(QObject* parent = nullptr);
-    ~Q_AudioRecorder();
+    explicit Q_RecordController(QObject* parent = nullptr);
+    explicit Q_RecordController(const std::filesystem::path& recordRootDir,
+                                QObject* parent = nullptr);
+    ~Q_RecordController();
 
-    bool startRecording(const std::filesystem::path& filePath);
+    bool startRecording(RecordedSentence& sentence);
     void stopRecording();
     bool isRecording() const;
 
@@ -32,6 +35,7 @@ class Q_AudioRecorder : public QObject {
    private:
     void initAudio();
     float calculateRMS(const QByteArray& buffer);
+    std::filesystem::path _path(const RecordedSentence& sentence);
 
     std::unique_ptr<QAudioSource> m_audioSource;
     std::unique_ptr<QFile> m_audioFile;
@@ -41,4 +45,6 @@ class Q_AudioRecorder : public QObject {
 
     QAudioFormat m_audioFormat;
     uint32_t m_totalBytes = 0;
+
+    std::filesystem::path m_recordRootDir;
 };

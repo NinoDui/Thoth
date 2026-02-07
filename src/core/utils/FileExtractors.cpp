@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "internal/FileExtractor.h"
+#include "thoth/Logger.h"
 
 class TxtExtractor : public FileExtractor {
    public:
@@ -20,6 +21,7 @@ class TxtExtractor : public FileExtractor {
 class PdfExtractor : public FileExtractor {
    public:
     std::string extract(const std::filesystem::path& path) const override {
+        LOG_ERROR("PDF extraction not implemented, but intended to extract {}", path.string());
         throw std::runtime_error("PDF extraction not implemented");
     }
 };

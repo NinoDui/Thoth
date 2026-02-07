@@ -20,8 +20,11 @@ struct Sentence {
 
     // Cache Audio File Path
     std::filesystem::path localAudioPath;
+};
 
-    double score = 0.0;
+struct RecordedSentence : Sentence {
+    std::filesystem::path localShadowingPath;
+    double shadowingScore = 0.0;
 };
 
 class Session {
@@ -31,6 +34,7 @@ class Session {
     std::string id;
     std::string title;
     std::vector<Sentence> sentences;
+    std::optional<std::vector<RecordedSentence>> recordedSentences;
 
     std::filesystem::path inputMediaPath;
 };
