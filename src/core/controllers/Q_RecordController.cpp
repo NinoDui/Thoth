@@ -3,6 +3,9 @@
 #include <QDebug>
 
 #include "internal/InternalEntity.h"
+#include "internal/LockFreeRingBuffer.h"
+#include "internal/Q_AudioCapture.h"
+#include "internal/Q_AudioStorage.h"
 #include "internal/Timer.h"
 #include "thoth/ConfigKey.h"
 #include "thoth/ConfigStore.h"
@@ -10,170 +13,115 @@
 #include "thoth/Logger.h"
 
 Q_RecordController::Q_RecordController(QObject* parent) : QObject(parent) {
-    m_recordRootDir =
-        ConfigStore::instance().getCacheDir() / "record" / thoth::internal::getCurrentTimestamp();
-    if (!std::filesystem::exists(m_recordRootDir)) {
-        std::filesystem::create_directories(m_recordRootDir);
-    }
-    initAudio();
+    // 1MB buffer, ~30s of audio
+    m_ringBuffer = std::make_unique<LockFreeRingBuffer>(DEFAULT_RING_BUFFER_SIZE);
+    m_captureProducer = std::make_unique<Q_AudioCaptureProducer>();
+    m_streamSaver = new AudioFileStreamSaver(m_ringBuffer.get(), m_captureProducer->format());
+    setupConnections();
 }
 
-Q_RecordController::Q_RecordController(const std::filesystem::path& recordRootDir, QObject* parent)
-    : QObject(parent) {
-    m_recordRootDir = recordRootDir;
-    if (!std::filesystem::exists(m_recordRootDir)) {
-        std::filesystem::create_directories(m_recordRootDir);
-    }
-    initAudio();
+Q_RecordController::Q_RecordController(std::unique_ptr<Q_AudioCaptureProducer> captureProducer,
+                                       AudioFileStreamSaver* streamSaver,
+                                       std::unique_ptr<LockFreeRingBuffer> ringBuffer,
+                                       QObject* parent)
+    : QObject(parent),
+      m_captureProducer(std::move(captureProducer)),
+      m_streamSaver(streamSaver),
+      m_ringBuffer(std::move(ringBuffer)) {
+    setupConnections();
 }
-Q_RecordController::~Q_RecordController() { stopRecording(); }
 
-uint16_t QAudioSampleFormatToBits(QAudioFormat::SampleFormat format) {
-    switch (format) {
-        case QAudioFormat::SampleFormat::UInt8:
-            return 8;
-        case QAudioFormat::SampleFormat::Int16:
-            return 16;
-        case QAudioFormat::SampleFormat::Int32:
-            return 32;
-        case QAudioFormat::SampleFormat::Float:
-            return 64;
-        default:
-            return 16;
+Q_RecordController::~Q_RecordController() {
+    stopRecording();
+    if (m_ioWorkerThread) {
+        m_ioWorkerThread->quit();
+        m_ioWorkerThread->wait();
     }
 }
 
-void Q_RecordController::initAudio() {
-    // By default, use 16kHz, Mono, 16-bit, which is compatiable to OpenAI Whisper
-    m_audioFormat.setSampleRate(
-        ConfigStore::instance()
-            .getValue<uint32_t>(thoth::config::KEY_AUDIO_RECORDER_SAMPLE_RATE)
-            .value_or(thoth::config::DEFAULT_AUDIO_RECORDER_SAMPLE_RATE));
-    m_audioFormat.setChannelCount(
-        ConfigStore::instance()
-            .getValue<uint16_t>(thoth::config::KEY_AUDIO_RECORDER_CHANNELS)
-            .value_or(thoth::config::DEFAULT_AUDIO_RECORDER_CHANNELS));
-    m_audioFormat.setSampleFormat(
-        [](uint16_t value) -> QAudioFormat::SampleFormat {
-            if (value == 8) return QAudioFormat::SampleFormat::UInt8;
-            if (value == 16) return QAudioFormat::SampleFormat::Int16;
-            if (value == 32) return QAudioFormat::SampleFormat::Int32;
-            if (value == 64) return QAudioFormat::SampleFormat::Float;
-            return QAudioFormat::SampleFormat::Int16;
-        }(ConfigStore::instance()
-                               .getValue<uint16_t>(thoth::config::KEY_AUDIO_RECORDER_SAMPLE_FORMAT)
-                               .value_or(thoth::config::DEFAULT_AUDIO_RECORDER_SAMPLE_FORMAT)));
+void Q_RecordController::setupConnections() {
+    // launch the IO thread
+    m_ioWorkerThread = new QThread(this);
+    m_streamSaver->moveToThread(m_ioWorkerThread);
 
-    QAudioDevice defaultDevice = QMediaDevices::defaultAudioInput();
-    if (!defaultDevice.isFormatSupported(m_audioFormat)) {
-        LOG_ERROR(
-            "Default audio input device does not support the requested format, trying the nearest "
-            "format.");
-        m_audioFormat = defaultDevice.preferredFormat();
-        LOG_WARN("Using the nearest format: {}kHz, {}ch, {}bit", m_audioFormat.sampleRate(),
-                 m_audioFormat.channelCount(),
-                 QAudioSampleFormatToBits(m_audioFormat.sampleFormat()));
-    }
+    // connections with the capture producer -> Controller
+    connect(m_captureProducer.get(), &Q_AudioCaptureProducer::audioDataAvailable, this,
+            &Q_RecordController::onAudioDataAvailable);
+    connect(m_captureProducer.get(), &Q_AudioCaptureProducer::errorOccurred, this,
+            &Q_RecordController::errorOccurred);
 
-    m_audioSource = std::make_unique<QAudioSource>(defaultDevice, m_audioFormat);
+    // connections Controller -> Storage (cross thread)
+    connect(this, &Q_RecordController::sigStartSession, m_streamSaver,
+            &AudioFileStreamSaver::startSession);
+    connect(this, &Q_RecordController::sigStopSession, m_streamSaver,
+            &AudioFileStreamSaver::finalizeSession);
+    connect(this, &Q_RecordController::sigAbortSession, m_streamSaver,
+            &AudioFileStreamSaver::abortSession);
+
+    // Storage (Consumer) -> Controller
+    connect(m_streamSaver, &AudioFileStreamSaver::sessionFinalized, this,
+            &Q_RecordController::onSessionFinalized);
+    connect(m_streamSaver, &AudioFileStreamSaver::sessionAborted, this,
+            &Q_RecordController::onSessionAborted);
+    connect(m_streamSaver, &AudioFileStreamSaver::errorOccurred, this,
+            &Q_RecordController::onStorageError);
+
+    // IO thread life cycle
+    connect(m_ioWorkerThread, &QThread::finished, m_streamSaver, &QObject::deleteLater);
+    m_ioWorkerThread->start();
 }
 
-bool Q_RecordController::startRecording(RecordedSentence& sentence) {
-    if (m_audioSource->state() == QAudio::ActiveState) {
+bool Q_RecordController::startRecording(const std::string& sessionId) {
+    if (m_isRecording) return false;
+
+    if (!m_captureProducer->start()) {
+        LOG_ERROR("Failed to start audio capture");
+        emit errorOccurred("Failed to start audio capture");
         return false;
     }
 
-    try {
-        sentence.localShadowingPath = _path(sentence);
-        QString qPath;
-#ifdef _WIN32
-        qPath = QString::fromStdWString(sentence.localShadowingPath.wstring());
-#else
-        qPath = QString::fromStdString(sentence.localShadowingPath.string());
-#endif
-        m_audioFile = std::make_unique<QFile>(qPath);
-        if (!m_audioFile->open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            LOG_ERROR("Failed to open file {} for recording", sentence.localShadowingPath.string());
-            emit errorOccurred("Failed to create recording file");
-            return false;
-        }
-    } catch (const std::exception& e) {
-        LOG_ERROR("Failed to start recording: {}", e.what());
-        emit errorOccurred("Failed to start recording: " + QString::fromStdString(e.what()));
-        return false;
-    }
-
-    QByteArray placeholder(44, 0);
-    m_audioFile->write(placeholder);
-    m_totalBytes = 0;
-
-    m_audioStream = m_audioSource->start();
-    if (m_audioSource->error() != QAudio::NoError) {
-        LOG_ERROR("Failed to start audio recording: {}", static_cast<int>(m_audioSource->error()));
-        emit errorOccurred("Failed to start audio recording: ");
-        return false;
-    }
-
-    connect(m_audioStream, &QIODevice::readyRead, this, &Q_RecordController::onReadyRecord);
+    emit sigStartSession(sessionId);
+    m_isRecording = true;
     return true;
 }
 
 void Q_RecordController::stopRecording() {
-    if (!m_audioSource || m_audioSource->state() == QAudio::StoppedState) {
-        return;
-    }
+    if (!m_isRecording) return;
 
-    if (m_audioStream) {
-        // disconnect and avoid remaining data envoking the slot
-        disconnect(m_audioStream, &QIODevice::readyRead, this, nullptr);
-    }
-    m_audioSource->stop();
-    m_audioStream = nullptr;
+    m_captureProducer->stop();
+    emit sigStopSession();
+    m_isRecording = false;
+}
 
-    // back-writing the actual size to WAV Header
-    if (m_audioFile && m_audioFile->isOpen()) {
-        m_audioFile->seek(0);  // back to the beginning of the file
+bool Q_RecordController::isRecording() const { return m_isRecording; }
 
-        WAVHeader wavHeader =
-            WAVHeader::create(m_audioFormat.sampleRate(), m_audioFormat.channelCount(),
-                              QAudioSampleFormatToBits(m_audioFormat.sampleFormat()), m_totalBytes);
-        m_audioFile->write(reinterpret_cast<const char*>(&wavHeader), sizeof(WAVHeader));
-        m_audioFile->close();
-        LOG_INFO("Recording stopped and saved to {}", m_audioFile->fileName().toStdString());
-    } else {
-        LOG_ERROR("Failed to write WAV header to file");
-        emit errorOccurred("Failed to write WAV header to file");
+void Q_RecordController::onAudioDataAvailable(const QByteArray& buffer) {
+    if (!m_isRecording) return;
+
+    // update the UI, calculate the RMS
+    float rms = calculateRMS(buffer);
+    emit updateAmplitude(rms);
+
+    // add data to the ring buffer for worker thread to save to the file
+    size_t written = m_ringBuffer->write(buffer.constData(), buffer.size());
+    if (written < buffer.size()) {
+        LOG_WARN("Failed to write all data to the ring buffer, only wrote {} bytes", written);
     }
 }
 
-bool Q_RecordController::isRecording() const {
-    return m_audioSource && m_audioSource->state() == QAudio::ActiveState;
+void Q_RecordController::onStorageError(const QString& errorMessage) {
+    LOG_ERROR("Failed to save audio data: {}", errorMessage.toStdString());
+    emit errorOccurred(errorMessage);
 }
 
-std::optional<std::filesystem::path> Q_RecordController::lastRecordingFilePath() const {
-    if (m_audioFile && m_audioFile->isOpen()) {
-        return std::filesystem::path(m_audioFile->fileName().toStdString());
-    }
-    return std::nullopt;
+void Q_RecordController::onSessionAborted() {
+    LOG_ERROR("Session aborted");
+    emit errorOccurred("Session aborted");
 }
 
-void Q_RecordController::onReadyRecord() {
-    if (!m_audioStream || !m_audioFile) return;
-
-    QByteArray buffer = m_audioStream->readAll();
-    if (buffer.isEmpty()) return;
-
-    qint64 written = m_audioFile->write(buffer);
-    if (written > 0) {
-        m_totalBytes += written;
-    }
-
-    float level = calculateRMS(buffer);
-    emit updateAmplitude(level);
-}
-
-std::filesystem::path Q_RecordController::_path(const RecordedSentence& sentence) {
-    return m_recordRootDir / (sentence.id + ".wav");
+void Q_RecordController::onSessionFinalized(const std::filesystem::path& sessionPath) {
+    LOG_INFO("Session finalized: {}", sessionPath.string());
+    emit recordingFinished(sessionPath);
 }
 
 template <typename T>

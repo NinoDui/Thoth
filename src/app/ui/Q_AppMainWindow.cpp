@@ -100,7 +100,7 @@ void Q_AppMainWindow::setupConnections() {
             LOG_WARN("Invalid index [{}], expected range [0, {})", idx, m_lstContent->count());
             return;
         }
-        m_recordController->startRecording(m_currentSession.recordedSentences->at(idx));
+        m_recordController->startRecording(m_currentSession.recordedSentences->at(idx).id);
     });
     connect(m_shadowingBar, &Q_ShadowingBar::sigStopRecording, this, [this]() {
         m_recordController->stopRecording();
