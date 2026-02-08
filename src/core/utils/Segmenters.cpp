@@ -25,7 +25,7 @@ bool RegexSegmenter::isValidSentence(const std::string& raw) const {
     // Case 1, all numbers -> False
     bool isAllNumbers = true;
     for (auto& c : raw) {
-        if (!std::isdigit(c)) {
+        if (!std::isdigit(static_cast<unsigned char>(c))) {
             isAllNumbers = false;
             break;
         }
@@ -35,7 +35,7 @@ bool RegexSegmenter::isValidSentence(const std::string& raw) const {
     // Case 2, all .!?, -> False
     bool isAllPunctuation = true;
     for (auto& c : raw) {
-        if (!std::ispunct(c)) {
+        if (!std::ispunct(static_cast<unsigned char>(c))) {
             isAllPunctuation = false;
             break;
         }
