@@ -1,50 +1,62 @@
 #pragma once
 
-#include <QAudioSource>
-#include <QFile>
-#include <QMediaDevices>
 #include <QObject>
+#include <QThread>
 #include <filesystem>
 #include <memory>
 #include <optional>
 
-struct WAVHeader;
-struct RecordedSentence;
+class LockFreeRingBuffer;
+class Q_AudioCaptureProducer;
+class AudioFileStreamSaver;
 
 class Q_RecordController : public QObject {
     Q_OBJECT
    public:
     explicit Q_RecordController(QObject* parent = nullptr);
-    explicit Q_RecordController(const std::filesystem::path& recordRootDir,
+    // dependency injection constructor, for testing
+    explicit Q_RecordController(std::unique_ptr<Q_AudioCaptureProducer> captureProducer,
+                                AudioFileStreamSaver* streamSaver,
+                                std::unique_ptr<LockFreeRingBuffer> ringBuffer,
                                 QObject* parent = nullptr);
     ~Q_RecordController();
 
-    bool startRecording(RecordedSentence& sentence);
+    bool startRecording(const std::string& sessionId);
     void stopRecording();
     bool isRecording() const;
 
-    std::optional<std::filesystem::path> lastRecordingFilePath() const;
-
    signals:
+    // external to ThothApp - UI signals
     void updateAmplitude(float level);
+    void recordingFinished(const std::filesystem::path& sessionPath);
     void errorOccurred(const QString& errorMessage);
 
+    // internal controlling signals, to IO Worker thread
+    void sigStartSession(const std::string& sessionId);
+    void sigStopSession();
+    void sigAbortSession();
+
    private slots:
-    void onReadyRecord();
+    // for audio capture device
+    void onAudioDataAvailable(const QByteArray& buffer);
+
+    // for IO Worker thread
+    void onStorageError(const QString& errorMessage);
+    void onSessionAborted();
+    void onSessionFinalized(const std::filesystem::path& sessionPath);
 
    private:
-    void initAudio();
     float calculateRMS(const QByteArray& buffer);
-    std::filesystem::path _path(const RecordedSentence& sentence);
+    void setupConnections();
 
-    std::unique_ptr<QAudioSource> m_audioSource;
-    std::unique_ptr<QFile> m_audioFile;
+    bool m_isRecording = false;
 
-    // observer pointer maintained by m_audioSource
-    QIODevice* m_audioStream = nullptr;
+    std::unique_ptr<LockFreeRingBuffer> m_ringBuffer;
+    std::unique_ptr<Q_AudioCaptureProducer> m_captureProducer;
 
-    QAudioFormat m_audioFormat;
-    uint32_t m_totalBytes = 0;
+    // IO Worker
+    AudioFileStreamSaver* m_streamSaver;
+    QThread* m_ioWorkerThread;
 
-    std::filesystem::path m_recordRootDir;
+    static constexpr size_t DEFAULT_RING_BUFFER_SIZE = 1024 * 1024;  // 1MB
 };
