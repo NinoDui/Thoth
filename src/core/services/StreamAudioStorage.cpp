@@ -22,15 +22,16 @@ AudioFileStreamSaver::AudioFileStreamSaver(LockFreeRingBuffer* buffer, const QAu
     if (!std::filesystem::exists(m_rootDir)) {
         std::filesystem::create_directories(m_rootDir);
     }
+
+    m_file = nullptr;
+    m_ioBuffer = std::vector<char>(IO_BUFFER_SIZE);
+
     m_timer = new QTimer(this);
     m_timer->setInterval(DRAIN_INTERVAL_MS);
     connect(m_timer, &QTimer::timeout, this, &AudioFileStreamSaver::_drainBufferToFile);
 }
 
-AudioFileStreamSaver::~AudioFileStreamSaver() {
-    m_timer->stop();
-    delete m_timer;
-}
+AudioFileStreamSaver::~AudioFileStreamSaver() { _stop(); }
 
 void AudioFileStreamSaver::startSession(const std::string& sessionId) {
     if (m_file && m_file->isOpen()) {
@@ -45,6 +46,8 @@ void AudioFileStreamSaver::startSession(const std::string& sessionId) {
 #else
     qPath = QString::fromStdString(path.string());
 #endif
+    LOG_DEBUG("Creating file {} for session: {}", qPath.toStdString(), m_sessionId.toStdString());
+
     m_file = new QFile(qPath);
     if (!m_file->open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         LOG_ERROR("Failed to open file for session: {}", m_sessionId.toStdString());
@@ -75,24 +78,34 @@ void AudioFileStreamSaver::finalizeSession() {
 
         QString fileName = m_file->fileName();
         m_file->close();
+        LOG_INFO("Session finalized: {}", fileName.toStdString());
         emit sessionFinalized(fileName.toStdString());
     } else {
         LOG_ERROR("Failed to write WAV header to file");
         emit errorOccurred(
             QString("Failed to write WAV header to file %1").arg(m_file->fileName()));
     }
+
+    _stop();
 }
 
 void AudioFileStreamSaver::abortSession() {
+    _stop();
+    emit sessionAborted();
+}
+
+void AudioFileStreamSaver::_stop() {
     m_timer->stop();
-    if (m_file && m_file->isOpen()) {
-        m_file->close();
-        m_file->remove();
-        emit sessionAborted();
-    } else {
-        LOG_ERROR("Failed to abort session");
-        emit errorOccurred(QString("Failed to abort session %1").arg(m_file->fileName()));
+    if (m_file) {
+        if (m_file->isOpen()) {
+            m_file->close();
+        }
+        delete m_file;
+        m_file = nullptr;
     }
+    m_ioBuffer.clear();
+    m_totalBytes = 0;
+    m_sessionId.clear();
 }
 
 void AudioFileStreamSaver::_drainBufferToFile() {
@@ -102,6 +115,8 @@ void AudioFileStreamSaver::_drainBufferToFile() {
 
     while (true) {
         size_t readBytes = m_dataSource->read(m_ioBuffer.data(), m_ioBuffer.size());
+        LOG_TRACE("Read {} bytes from the ring buffer, current buffer size: {} / {}", readBytes,
+                  m_dataSource->size(), m_dataSource->capacity());
         if (readBytes == 0) break;
 
         uint64_t writtenBytes = m_file->write(m_ioBuffer.data(), readBytes);

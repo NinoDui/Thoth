@@ -27,6 +27,7 @@ class Q_PlaybackController : public QObject {
     void setSession(const Session& session);
 
     // control the playback (business logic)
+    void play();
     void playSentence(int idx);
     void playNext();
     void playPrevious();

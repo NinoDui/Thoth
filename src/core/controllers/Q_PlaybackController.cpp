@@ -17,6 +17,8 @@ Q_PlaybackController::Q_PlaybackController(QObject* parent)
     m_delayTimer->setSingleShot(true);
 
     m_contentProvider = std::make_unique<TextContentProvider>();
+    m_currentIdx = DEFAULT_START_IDX;
+
     setupConnections();
 }
 
@@ -104,10 +106,10 @@ void Q_PlaybackController::_Q_play(const std::filesystem::path& localPath) {
 #endif
     LOG_DEBUG("Sending file {} to player", qPath.toStdString());
 
-    m_player->setSource(QUrl::fromLocalFile(qPath));
-    m_player->play();
     emit playbackStarted(m_currentIdx);
     emit statusMessageChanged(QString("Playing sentence [%1]").arg(m_currentIdx));
+    m_player->setSource(QUrl::fromLocalFile(qPath));
+    m_player->play();
 }
 
 void Q_PlaybackController::_fetchNext(int start_idx) {
@@ -129,6 +131,12 @@ void Q_PlaybackController::reset() {
     m_currentIdx = DEFAULT_START_IDX;
 }
 
+void Q_PlaybackController::play() {
+    if (m_player->playbackState() != QMediaPlayer::PlayingState) {
+        playSentence(m_currentIdx);
+    }
+}
+
 void Q_PlaybackController::pause() {
     if (m_player->playbackState() == QMediaPlayer::PlayingState) {
         m_player->pause();
@@ -139,10 +147,10 @@ void Q_PlaybackController::pause() {
 
 void Q_PlaybackController::resume() {
     LOG_DEBUG("Resume is called, current index: {}", m_currentIdx);
-    if (m_player->playbackState() == QMediaPlayer::PausedState) {
-        m_player->play();
+    if (m_player->playbackState() != QMediaPlayer::PlayingState) {
         emit playbackStarted(m_currentIdx);
         emit statusMessageChanged(QString("Playing sentence [%1]").arg(m_currentIdx));
+        m_player->play();
     }
 }
 

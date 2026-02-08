@@ -74,7 +74,7 @@ void Q_AppMainWindow::setupUI() {
 void Q_AppMainWindow::setupConnections() {
     // connections with the playbackController (Audio Play)
     connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPlay,
-            [this]() { m_playbackController->resume(); });
+            [this]() { m_playbackController->play(); });
     connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPause,
             [this]() { m_playbackController->pause(); });
     connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPrev,
@@ -106,6 +106,8 @@ void Q_AppMainWindow::setupConnections() {
         m_recordController->stopRecording();
         m_shadowingBar->onRecordingFinished();
     });
+    connect(m_shadowingBar, &Q_ShadowingBar::sigPlayUserAudio, this,
+            [this]() { LOG_CRITICAL("Play user audio is not implemented yet"); });
     connect(m_recordController.get(), &Q_RecordController::updateAmplitude, m_shadowingBar,
             &Q_ShadowingBar::setAmplitude);
     connect(m_recordController.get(), &Q_RecordController::errorOccurred, this,

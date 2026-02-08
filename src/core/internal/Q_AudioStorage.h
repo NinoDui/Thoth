@@ -54,6 +54,7 @@ class AudioFileStreamSaver : public Q_AudioStreamConsumer {
 
    private:
     void _drainBufferToFile();
+    void _stop();
 
     LockFreeRingBuffer* m_dataSource = nullptr;
     std::filesystem::path m_rootDir;
@@ -63,7 +64,7 @@ class AudioFileStreamSaver : public Q_AudioStreamConsumer {
     uint64_t m_totalBytes = 0;
     QTimer* m_timer;
     QAudioFormat m_format;
-    std::vector<char> m_ioBuffer{std::vector<char>(IO_BUFFER_SIZE)};
+    std::vector<char> m_ioBuffer;
 
     static constexpr size_t IO_BUFFER_SIZE = 4096;
     static constexpr size_t DRAIN_INTERVAL_MS = 30;
