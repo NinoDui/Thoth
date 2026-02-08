@@ -3,6 +3,8 @@
 Q_PlaybackControlBar::Q_PlaybackControlBar(QWidget* parent) : QWidget(parent) {
     setupUI();
     setupConnections();
+
+    m_isPlaying = false;
 }
 
 void Q_PlaybackControlBar::setupUI() {
@@ -53,12 +55,13 @@ void Q_PlaybackControlBar::setupConnections() {
     connect(m_btnNext, &QPushButton::clicked, this, &Q_PlaybackControlBar::sigNext);
 
     connect(m_btnPlayPause, &QPushButton::clicked, [this]() {
-        if (m_isPlaying)
+        if (m_isPlaying) {
             emit sigPause();
-        else
+        } else {
             emit sigPlay();
+        }
+        setPlayingState(!m_isPlaying);
     });
-
     connect(m_chkLoop, &QCheckBox::toggled, [this](bool checked) {
         m_singleLoop = checked;
         emit sigLoopModeChanged(checked);

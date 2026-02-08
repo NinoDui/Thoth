@@ -104,6 +104,8 @@ void Q_RecordController::onAudioDataAvailable(const QByteArray& buffer) {
 
     // add data to the ring buffer for worker thread to save to the file
     size_t written = m_ringBuffer->write(buffer.constData(), buffer.size());
+    LOG_TRACE("Written {} bytes to the ring buffer, current buffer size: {} / {}", written,
+              m_ringBuffer->size(), m_ringBuffer->capacity());
     if (written < buffer.size()) {
         LOG_WARN("Failed to write all data to the ring buffer, only wrote {} bytes", written);
     }

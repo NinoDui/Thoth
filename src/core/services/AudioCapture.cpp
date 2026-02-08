@@ -13,27 +13,37 @@ Q_AudioCaptureProducer::~Q_AudioCaptureProducer() { stop(); }
 
 bool Q_AudioCaptureProducer::start() {
     if (!m_audioSource || m_audioSource->state() == QAudio::ActiveState) {
+        LOG_DEBUG("Audio source is not ready for recording, current state is {}",
+                  static_cast<int>(m_audioSource->state()));
         return false;
     }
     if (!m_device) {
-        return false;
+        LOG_INFO("Starting audio capture, no device found, creating a new one");
+        m_device = m_audioSource->start();
+        if (!m_device) {
+            LOG_ERROR("Failed to start audio capture, no device found");
+            emit errorOccurred("Failed to start audio capture, no device found");
+            return false;
+        }
+
+        connect(m_device, &QIODevice::readyRead, this, &Q_AudioCaptureProducer::_onReadyRead);
     }
 
-    connect(m_device, &QIODevice::readyRead, this, &Q_AudioCaptureProducer::_onReadyRead);
     return true;
 }
 
 void Q_AudioCaptureProducer::stop() {
-    if (!m_audioSource || m_audioSource->state() == QAudio::StoppedState) {
+    if (!m_audioSource) {
+        LOG_DEBUG("Audio source is not set in Audio Capture Producer, skip the stop operation.");
         return;
     }
-    if (m_audioSource) {
+    if (m_audioSource || m_audioSource->state() != QAudio::StoppedState) {
         m_audioSource->stop();
     }
     if (m_device) {
         disconnect(m_device, &QIODevice::readyRead, this, nullptr);
+        m_device = nullptr;
     }
-    m_device = nullptr;
 }
 
 QAudioFormat Q_AudioCaptureProducer::format() const { return m_format; }
@@ -43,11 +53,21 @@ void Q_AudioCaptureProducer::_onReadyRead() {
         LOG_ERROR("Audio device is not set");
         return;
     }
+
+    // FOR DEBUG ONLY
+    if (m_audioSource && m_audioSource->error() != QAudio::NoError) {
+        LOG_ERROR("Audio source error: {}", static_cast<int>(m_audioSource->error()));
+        emit errorOccurred(
+            QString("Audio source error: %1").arg(static_cast<int>(m_audioSource->error())));
+        return;
+    }
+
     QByteArray buffer = m_device->readAll();
     if (!buffer.isEmpty()) {
         emit audioDataAvailable(buffer);
+        LOG_TRACE("Audio data available from IO Device, size: {}", buffer.size());
     } else {
-        LOG_WARN("No audio data available from IO Device");
+        LOG_TRACE("No audio data available from IO Device");
     }
 }
 

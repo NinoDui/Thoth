@@ -69,6 +69,8 @@ size_t LockFreeRingBuffer::size() const {
     return availableReadSpace(curR, curW);
 }
 
+size_t LockFreeRingBuffer::capacity() const { return m_capacity; }
+
 bool LockFreeRingBuffer::isEmpty() const { return size() == 0; }
 
 bool LockFreeRingBuffer::isFull() const {

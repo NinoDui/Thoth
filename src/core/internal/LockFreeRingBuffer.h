@@ -38,6 +38,7 @@ class LockFreeRingBuffer {
     size_t size() const;
     bool isEmpty() const;
     bool isFull() const;
+    size_t capacity() const;
     void clear();
 
     friend std::ostream& operator<<(std::ostream& os, const LockFreeRingBuffer& buffer);
