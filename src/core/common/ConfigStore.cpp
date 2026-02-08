@@ -17,7 +17,15 @@ ConfigStore& ConfigStore::instance() {
 void ConfigStore::init() {
     fs::path homeDir;
 #ifdef _WIN32
-    if (const char* env_p = std::getenv("USERPROFILE")) homeDir = env_p;
+    char* env_buf = nullptr;
+    size_t len = 0;
+    if (_dupenv_s(&env_buf, &len, "USERPROFILE") == 0 && env_buf != nullptr) {
+        homeDir = std::string(env_buf);
+        free(env_buf);
+    } else {
+        spdlog::error("Failed to get USERPROFILE environment variable");
+        homeDir = fs::path();
+    }
 #else
     if (const char* env_p = std::getenv("HOME")) homeDir = env_p;
 #endif

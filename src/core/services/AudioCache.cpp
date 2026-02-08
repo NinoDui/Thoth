@@ -7,6 +7,8 @@
 
 namespace fs = std::filesystem;
 
+// TODO: replace with IAudioStorage Interfaces
+
 AudioCache::AudioCache() : m_cacheDir(ConfigStore::instance().getCacheDir()), m_override(false) {
     if (!fs::exists(m_cacheDir) || (m_override && fs::exists(m_cacheDir))) {
         fs::create_directories(m_cacheDir);

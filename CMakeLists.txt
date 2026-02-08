@@ -12,134 +12,25 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    # avoid Unicode character encoding issues in Windows
 if(MSVC)
-    add_compile_options("/utf-8")
+    add_compile_options(/utf-8 /W4)
+    add_link_options(/ignore:4099)
     # add_compile_options("/fsanitize=address")
+else()
+    add_compile_options(-Wall -Wextra -pedantic)
 endif()
 
 # Dependencies
-find_package(Qt6 COMPONENTS Core Concurrent Widgets Network Multimedia REQUIRED)
+find_package(Qt6 COMPONENTS Core Concurrent Widgets Network Multimedia Test REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(google_cloud_cpp_texttospeech REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 
-# Target-1, ThothCore Logic (as a static library)
-
-file(GLOB_RECURSE CORE_SRCS src/core/*.cpp)
-message(STATUS "CORE_SRCS: ${CORE_SRCS}")
-
-file(GLOB CORE_PUB_HDRS include/thoth/*.h)
-message(STATUS "CORE_PUB_HDRS: ${CORE_PUB_HDRS}")
-
-file(GLOB CORE_INT_HDRS src/core/internal/*.h)
-message(STATUS "CORE_INT_HDRS: ${CORE_INT_HDRS}")
-
-# Let the building system (CMake/Moc/Rcc) know "required" sources
-add_library(ThothCore STATIC
-    ${CORE_SRCS}
-    ${CORE_PUB_HDRS}
-    ${CORE_INT_HDRS}
-)
-
-# Controlling visibility
-target_include_directories(ThothCore
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/core
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/core/internal
-)
-
-target_link_libraries(ThothCore
-    PUBLIC
-        # for dependencies wihch is exposed by headers under include/thoth
-        Qt6::Core
-        Qt6::Network
-        Qt6::Concurrent
-        Qt6::Multimedia
-        google-cloud-cpp::texttospeech
-        spdlog::spdlog
-    PRIVATE 
-        nlohmann_json::nlohmann_json
-)
-
-# Target-2, ThothApp
-SET(APP_ENTRY_SRC
-    src/app/main.cpp
-    src/app/AppRunner.cpp
-    src/app/AppRunner.h
-)
-SET(APP_UI_SRC
-    src/app/ui/Q_AppMainWindow.cpp
-    src/app/ui/Q_AppMainWindow.h
-    src/app/ui/Q_SettingDialog.cpp
-    src/app/ui/Q_SettingDialog.h
-    src/app/ui/StyleLoader.h
-)
-SET(APP_RESOURCES
-    src/app/resources/resources.qrc
-)
-add_executable(ThothApp
-    ${APP_ENTRY_SRC}
-    ${APP_UI_SRC}
-    ${APP_RESOURCES}
-)
-
-target_link_libraries(ThothApp PRIVATE
-    ThothCore
-    Qt6::Widgets
-)
-
-if(WIN32)
-    # set_target_properties(ThothApp PROPERTIES WIN32_EXECUTABLE ON)
-endif()
-
-# Target-3, Thoth Unit Tests
 enable_testing()
 
-# file(GLOB TEST_SRCS test/*.cpp)
-SET(TEST_SRCS
-    test/TextParserTest.cpp
-)
-message(STATUS "TEST_SRCS: ${TEST_SRCS}")
-add_executable(ThothTests
-    ${TEST_SRCS}
-)
-
-target_include_directories(ThothTests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/internal
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_link_libraries(ThothTests PRIVATE
-    ThothCore
-    GTest::gtest
-    GTest::gtest_main
-    GTest::gmock
-)
-
-target_compile_definitions(ThothTests PRIVATE
-    TEST_RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/resources"
-)
-
-include(GoogleTest)
-include(CTest)
-
-# Discover and register tests with CTest
-gtest_discover_tests(ThothTests
-    DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST
-    PROPERTIES
-        TIMEOUT 30
-)
-
-# Add custom test target for convenience
-add_custom_target(ThothTest
-    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-    DEPENDS ThothTests
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Running unit tests..."
-)
+add_subdirectory(src/core)
+add_subdirectory(src/app)
+add_subdirectory(test)
 
 # Target-4, Thoth Documentation
 add_custom_target(ThothDocs

@@ -1,4 +1,4 @@
-#include "thoth/TextParser.h"
+#include "internal/TextParser.h"
 
 #include "internal/FileExtractor.h"
 #include "internal/Segmenter.h"
