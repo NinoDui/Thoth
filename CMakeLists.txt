@@ -20,14 +20,24 @@ else()
 endif()
 
 # Dependencies
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/third_party/whisper.cpp/CMakeLists.txt")
+    message(FATAL_ERROR
+        "whisper.cpp submodule not found. Run 'git submodule update --init --recursive' to initialize it.")
+endif()
+
 find_package(Qt6 COMPONENTS Core Concurrent Widgets Network Multimedia Test REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(google_cloud_cpp_texttospeech REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 
+set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "Build Whisper examples" FORCE)
+set(WHISPER_BUILD_TESTS OFF CACHE BOOL "Build Whisper tests" FORCE)
+set(WHISPER_BUILD_SERVER OFF CACHE BOOL "Build Whisper server" FORCE)
+
 enable_testing()
 
+add_subdirectory(third_party/whisper.cpp EXCLUDE_FROM_ALL SYSTEM)
 add_subdirectory(src/core)
 add_subdirectory(src/app)
 add_subdirectory(test)
