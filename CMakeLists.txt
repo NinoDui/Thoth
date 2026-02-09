@@ -12,12 +12,16 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    # avoid Unicode character encoding issues in Windows
 if(MSVC)
-    add_compile_options(/utf-8 /W4)
     add_link_options(/ignore:4099)
-    # add_compile_options("/fsanitize=address")
-else()
-    add_compile_options(-Wall -Wextra -pedantic)
 endif()
+
+function(thoth_set_warning target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4)
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -pedantic)
+    endif()
+endfunction()
 
 # Dependencies
 if(NOT EXISTS "${CMAKE_SOURCE_DIR}/third_party/whisper.cpp/CMakeLists.txt")
@@ -31,6 +35,7 @@ find_package(google_cloud_cpp_texttospeech REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 
+# exclude examples, tests, and server from Whisper build, for clean build
 set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "Build Whisper examples" FORCE)
 set(WHISPER_BUILD_TESTS OFF CACHE BOOL "Build Whisper tests" FORCE)
 set(WHISPER_BUILD_SERVER OFF CACHE BOOL "Build Whisper server" FORCE)
