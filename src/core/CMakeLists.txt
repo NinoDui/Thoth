@@ -41,4 +41,5 @@ target_link_libraries(ThothCore
         spdlog::spdlog
     PRIVATE 
         nlohmann_json::nlohmann_json
+        whisper
 )
