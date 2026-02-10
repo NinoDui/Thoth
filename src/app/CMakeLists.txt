@@ -24,6 +24,7 @@ add_executable(ThothApp
     ${APP_UI_SRC}
     ${APP_RESOURCES}
 )
+thoth_set_warning(ThothApp)
 
 target_link_libraries(ThothApp PRIVATE
     ThothCore

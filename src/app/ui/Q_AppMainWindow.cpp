@@ -11,8 +11,9 @@
 #include "thoth/ContentProvider.h"
 #include "thoth/Entity.h"
 #include "thoth/Logger.h"
-#include "thoth/Q_PlaybackController.h"
+#include "thoth/Q_AudioPlayer.h"
 #include "thoth/Q_RecordController.h"
+#include "thoth/Q_SessionPlaybackController.h"
 
 Q_AppMainWindow::Q_AppMainWindow(QWidget* parent) : QMainWindow(parent) {
     setupControllers();
@@ -27,7 +28,10 @@ Q_AppMainWindow::~Q_AppMainWindow() = default;
 
 void Q_AppMainWindow::setupControllers() {
     m_textContentProvider = std::make_unique<TextContentProvider>();
-    m_playbackController = std::make_unique<Q_PlaybackController>(m_textContentProvider.get());
+    m_audioPlayer = std::make_unique<Q_AudioPlayer>();
+
+    m_sessionPlaybackController = std::make_unique<Q_SessionPlaybackController>(
+        m_audioPlayer.get(), m_textContentProvider.get());
     m_recordController = std::make_unique<Q_RecordController>();
 }
 
@@ -73,28 +77,30 @@ void Q_AppMainWindow::setupUI() {
 
 void Q_AppMainWindow::setupConnections() {
     // connections with the playbackController (Audio Play)
-    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPlay,
-            [this]() { m_playbackController->play(); });
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPlay, m_sessionPlaybackController.get(),
+            &Q_SessionPlaybackController::play);
     connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPause,
-            [this]() { m_playbackController->pause(); });
-    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPrev,
-            [this]() { m_playbackController->playPrevious(); });
-    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigNext,
-            [this]() { m_playbackController->playNext(); });
+            m_sessionPlaybackController.get(), &Q_SessionPlaybackController::pause);
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPrev, m_sessionPlaybackController.get(),
+            &Q_SessionPlaybackController::playPrevious);
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigNext, m_sessionPlaybackController.get(),
+            &Q_SessionPlaybackController::playNext);
     connect(m_playbackControlBar, &Q_PlaybackControlBar::sigLoopModeChanged, [this](bool checked) {
-        m_playbackController->setLoopSingle(checked, m_playbackControlBar->loopDelay());
+        m_sessionPlaybackController->setLoopSingle(checked, m_playbackControlBar->loopDelay());
     });
     connect(m_playbackControlBar, &Q_PlaybackControlBar::sigDelayChanged, [this](int value) {
-        m_playbackController->setLoopSingle(m_playbackControlBar->loopMode(), value);
+        m_sessionPlaybackController->setLoopSingle(m_playbackControlBar->loopMode(), value);
     });
     connect(m_lstContent, &QListWidget::itemDoubleClicked, [this](QListWidgetItem* item) {
-        m_playbackController->playSentence(item->data(Qt::UserRole).toInt());
+        m_sessionPlaybackController->playSentence(item->data(Qt::UserRole).toInt());
     });
-    connect(m_playbackController.get(), &Q_PlaybackController::playbackStarted, this,
-            &Q_AppMainWindow::onCoreSentenceChanged);
+    connect(m_sessionPlaybackController.get(), &Q_SessionPlaybackController::sentencePlayStarted,
+            this, &Q_AppMainWindow::onCoreSentenceChanged);
 
     // connections with the shadowingBar (Shadowing Record)
     connect(m_shadowingBar, &Q_ShadowingBar::sigStartRecording, this, [this]() {
+        m_sessionPlaybackController->stop();
+
         int idx = m_lstContent->currentRow();
         if (idx < 0 || idx >= m_lstContent->count()) {
             LOG_WARN("Invalid index [{}], expected range [0, {})", idx, m_lstContent->count());
@@ -106,14 +112,37 @@ void Q_AppMainWindow::setupConnections() {
         m_recordController->stopRecording();
         m_shadowingBar->onRecordingFinished();
     });
-    connect(m_shadowingBar, &Q_ShadowingBar::sigPlayUserAudio, this,
-            [this]() { LOG_CRITICAL("Play user audio is not implemented yet"); });
+    connect(m_shadowingBar, &Q_ShadowingBar::sigPlayUserAudio, this, [this]() {
+        int idx = m_lstContent->currentRow();
+        if (idx < 0 || idx >= m_lstContent->count()) {
+            LOG_WARN("Invalid index [{}], expected range [0, {})", idx, m_lstContent->count());
+            return;
+        }
+        const auto& path = m_currentSession.recordedSentences->at(idx).localShadowingPath;
+        if (path.empty() || !std::filesystem::exists(path)) {
+            LOG_WARN("No shadowing audio found for sentence [{}]", idx);
+            return;
+        }
+
+        m_sessionPlaybackController->stop();
+        m_audioPlayer->play(path);
+    });
     connect(m_recordController.get(), &Q_RecordController::updateAmplitude, m_shadowingBar,
             &Q_ShadowingBar::setAmplitude);
     connect(m_recordController.get(), &Q_RecordController::errorOccurred, this,
             [this](const QString& errorMessage) {
                 LOG_ERROR("Recorder error: {}", errorMessage.toStdString());
                 m_shadowingBar->reset();
+            });
+    connect(m_recordController.get(), &Q_RecordController::recordingFinished, this,
+            [this](const std::filesystem::path& path) {
+                int idx = m_lstContent->currentRow();
+                if (idx < 0 || idx >= m_lstContent->count()) {
+                    LOG_WARN("Invalid index [{}], expected range [0, {})", idx,
+                             m_lstContent->count());
+                    return;
+                }
+                m_currentSession.recordedSentences->at(idx).localShadowingPath = path;
             });
 }
 
@@ -140,7 +169,7 @@ void Q_AppMainWindow::onImportFile() {
                 m_currentSession.recordedSentences->push_back(
                     RecordedSentence{sentence, std::filesystem::path(), 0.0});
             }
-            m_playbackController->setSession(m_currentSession);
+            m_sessionPlaybackController->setSession(m_currentSession);
             m_lblStatus->setText("Loaded " + QString::number(m_currentSession.sentences.size()) +
                                  " sentences");
             updateContentList();

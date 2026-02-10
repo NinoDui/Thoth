@@ -12,7 +12,8 @@
 
 #include "thoth/Entity.h"
 
-class Q_PlaybackController;
+class Q_SessionPlaybackController;
+class Q_AudioPlayer;
 class Q_PlaybackControlBar;
 class TextContentProvider;
 class Q_ShadowingBar;
@@ -45,9 +46,10 @@ class Q_AppMainWindow : public QMainWindow {
 
     int m_lastHighlightedIdx = -1;
 
-    std::unique_ptr<Q_PlaybackController> m_playbackController;
-    std::unique_ptr<Q_RecordController> m_recordController;
     std::unique_ptr<TextContentProvider> m_textContentProvider;
-    
+    std::unique_ptr<Q_AudioPlayer> m_audioPlayer;
+    std::unique_ptr<Q_SessionPlaybackController> m_sessionPlaybackController;
+    std::unique_ptr<Q_RecordController> m_recordController;
+
     Session m_currentSession;
 };
