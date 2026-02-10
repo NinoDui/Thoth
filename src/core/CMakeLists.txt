@@ -21,6 +21,8 @@ set(CORE_SRC_FILES
 
 add_library(ThothCore STATIC ${CORE_SRC_FILES})
 
+thoth_set_warning(ThothCore)
+
 target_include_directories(ThothCore
 PUBLIC
     # Generator Expression, available and evaluated in Generation Phase
@@ -41,4 +43,5 @@ target_link_libraries(ThothCore
         spdlog::spdlog
     PRIVATE 
         nlohmann_json::nlohmann_json
+        whisper
 )
