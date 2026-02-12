@@ -40,14 +40,14 @@ void TextContentProvider::load(const std::filesystem::path& inputMediaPath,
     }
 }
 
-void TextContentProvider::prepareAudio(Sentence& sentence,
-                                       std::function<void(bool success)> callback) {
+void TextContentProvider::prepareAudio(
+    Sentence& sentence, std::function<void(bool success, const QString& errorMsg)> callback) {
     // 1. Check if the audio is already cached
     if (auto p = m_audioCache->get(sentence.text)) {
         sentence.localAudioPath = p->string();
         LOG_DEBUG("Audio for sentence [{}] is already cached at {}", sentence.id,
                   sentence.localAudioPath.string());
-        callback(true);
+        callback(true, QString());
         return;
     }
 
@@ -61,16 +61,17 @@ void TextContentProvider::prepareAudio(Sentence& sentence,
     m_downloadingIdx.insert(sentence.id);
     try {
         m_ttsDownloader->download(
-            sentence.text, [this, &sentence, callback](bool success, QByteArray data) {
+            sentence.text,
+            [this, &sentence, callback](bool success, QByteArray data, QString errorMsg) {
                 if (success) {
                     auto p = m_audioCache->saveAudio(std::stoi(sentence.id), sentence.text, data);
                     sentence.localAudioPath = p.string();
                     LOG_DEBUG("Downloaded audio for sentence [{}] to {}", sentence.id,
                               sentence.localAudioPath.string());
-                    callback(true);
+                    callback(true, QString());
                 } else {
                     LOG_ERROR("Failed to download audio for sentence [{}]", sentence.id);
-                    callback(false);
+                    callback(false, errorMsg);
                 }
                 m_downloadingIdx.erase(sentence.id);
             });
@@ -80,7 +81,7 @@ void TextContentProvider::prepareAudio(Sentence& sentence,
             "status is {}",
             e.what(), *this);
         m_downloadingIdx.erase(sentence.id);
-        callback(false);
+        callback(false, QString::fromStdString(e.what()));
     }
 }
 

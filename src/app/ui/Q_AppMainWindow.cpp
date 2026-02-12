@@ -96,6 +96,8 @@ void Q_AppMainWindow::setupConnections() {
     });
     connect(m_sessionPlaybackController.get(), &Q_SessionPlaybackController::sentencePlayStarted,
             this, &Q_AppMainWindow::onCoreSentenceChanged);
+    connect(m_sessionPlaybackController.get(), &Q_SessionPlaybackController::errorOccurred, this,
+            &Q_AppMainWindow::onPlaybackError);
 
     // connections with the shadowingBar (Shadowing Record)
     connect(m_shadowingBar, &Q_ShadowingBar::sigStartRecording, this, [this]() {
@@ -186,6 +188,28 @@ void Q_AppMainWindow::updateContentList() {
         QListWidgetItem* item = new QListWidgetItem(text);
         item->setData(Qt::UserRole, static_cast<int>(i));
         m_lstContent->addItem(item);
+    }
+}
+
+void Q_AppMainWindow::onPlaybackError(const QString& errorMsg) {
+    LOG_ERROR("Playback error: {}", errorMsg.toStdString());
+
+    QMessageBox msgBox(this);
+    msgBox.setIcon(QMessageBox::Warning);
+    msgBox.setWindowTitle("Audio Playback Error");
+    msgBox.setText("Failed to download audio from Google Cloud TTS.");
+    msgBox.setInformativeText(
+        "This may be caused by network issues or missing proxy configuration.\n\n"
+        "You can configure your proxy in Settings.\n\n"
+        "Details: " +
+        errorMsg);
+    QPushButton* openSettingsBtn = msgBox.addButton("Open Settings", QMessageBox::ActionRole);
+    msgBox.addButton(QMessageBox::Ok);
+    msgBox.exec();
+
+    if (msgBox.clickedButton() == openSettingsBtn) {
+        Q_SettingDialog dialog(this);
+        dialog.exec();
     }
 }
 

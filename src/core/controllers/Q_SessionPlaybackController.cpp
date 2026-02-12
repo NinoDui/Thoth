@@ -77,7 +77,7 @@ void Q_SessionPlaybackController::playSentence(int idx) {
 
     // Try get the audio
     Sentence& sentence = m_session.sentences[idx];
-    m_contentProvider->prepareAudio(sentence, [this, idx](bool success) {
+    m_contentProvider->prepareAudio(sentence, [this, idx](bool success, const QString& errorMsg) {
         // if the target sentence is set to others
         if (idx != m_currentIdx || !m_active) {
             LOG_INFO("Ignore the stale playback callback sentence [{}]", idx);
@@ -90,7 +90,10 @@ void Q_SessionPlaybackController::playSentence(int idx) {
             _prefetchNext(idx);
         } else {
             LOG_ERROR("Failed to prepare audio for sentence [{}]", idx);
-            emit errorOccurred(QString("Failed to prepare audio for sentence [%1]").arg(idx));
+            QString detail = errorMsg.isEmpty()
+                                 ? QString("Failed to prepare audio for sentence [%1]").arg(idx)
+                                 : errorMsg;
+            emit errorOccurred(detail);
             emit statusMessageChanged(
                 QString("Failed to prepare audio for sentence [%1]").arg(idx));
         }
@@ -101,7 +104,7 @@ void Q_SessionPlaybackController::_prefetchNext(int start_idx) {
     for (size_t i = 1; start_idx + i < m_session.sentences.size() && i <= PRELOAD_WINDOW; ++i) {
         int next_idx = start_idx + i;
         Sentence& sentence = m_session.sentences[next_idx];
-        m_contentProvider->prepareAudio(sentence, [next_idx](bool success) {
+        m_contentProvider->prepareAudio(sentence, [next_idx](bool success, const QString&) {
             if (!success) {
                 LOG_ERROR("Failed to prefetch audio for sentence [{}]", next_idx);
                 return;
