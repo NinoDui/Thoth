@@ -1,0 +1,14 @@
+{
+  "name": "thoth",
+  "version": "0.1.0",
+  "description": "Thoth - Echo software for language learning",
+  "dependencies": [
+    "nlohmann-json",
+    "spdlog",
+    {
+      "name": "google-cloud-cpp",
+      "features": ["texttospeech"]
+    },
+    "gtest"
+]
+}

@@ -1,4 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
+
+# vcpkg toolchain: use Thoth wrapper (sets x64-osx triplet on macOS before vcpkg runs)
+if(DEFINED ENV{VCPKG_ROOT})
+    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/cmake/ThothVcpkgToolchain.cmake"
+        CACHE STRING "Vcpkg toolchain file" FORCE)
+endif()
+
 project(Thoth LANGUAGES CXX)
 
 # Global Settings
