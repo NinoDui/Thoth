@@ -5,8 +5,15 @@
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
     set(VCPKG_TARGET_TRIPLET "x64-osx" CACHE STRING "Force x64-osx on macOS (grpc arm64 workaround)" FORCE)
     set(VCPKG_HOST_TRIPLET "x64-osx" CACHE STRING "Force x64-osx host tools on macOS (grpc arm64 workaround)" FORCE)
-    if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
+        if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
         set(CMAKE_OSX_ARCHITECTURES "x86_64" CACHE STRING "Build for x86_64 to match vcpkg x64-osx triplet" FORCE)
     endif()
 endif()
+
+ # Merge $ENV{CMAKE_PREFIX_PATH} into CMake's variable before vcpkg.cmake overwrites it
+if(DEFINED ENV{CMAKE_PREFIX_PATH})
+    string(REPLACE ":" ";" _env_prefix "$ENV{CMAKE_PREFIX_PATH}")
+    list(APPEND CMAKE_PREFIX_PATH ${_env_prefix})
+endif()
+
 include("$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
