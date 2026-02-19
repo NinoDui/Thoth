@@ -1,4 +1,5 @@
 # Thoth
+
 An echo software for language learning, implemented by C++.
 
 ## Development Prep
@@ -34,7 +35,7 @@ cmake --build build
 
 ### Windows
 
-*Have to say I hate setting up the dev environment on Windows.*
+_Have to say I hate setting up the dev environment on Windows._
 
 ```shell
 winget install Git.Git
@@ -43,6 +44,7 @@ winget install Microsoft.VisualStudio.2022.BuildTools
 ```
 
 ## Next TODOs
-- [] Audio Recorder for shadowing
-- [] ASR / STT (integration of OpenAI Whisper), WER / Levenshtein Distance
-- [] Pitch & Prosody Analysis (e.g. Aubio), for F0/Pitch or Energy curves
+
+- [x] Audio Recorder for shadowing
+- [x] ASR / STT (integration of OpenAI Whisper), WER / Levenshtein Distance
+- [ ] Pitch & Prosody Analysis (e.g. Aubio), for F0/Pitch or Energy curves
