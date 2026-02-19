@@ -20,7 +20,7 @@ class Q_GCPTTSDownloader : public QObject {
     explicit Q_GCPTTSDownloader(QObject* parent = nullptr);
     ~Q_GCPTTSDownloader() = default;
 
-    using DownloadCallback = std::function<void(bool success, QByteArray data)>;
+    using DownloadCallback = std::function<void(bool success, QByteArray data, QString errorMsg)>;
     void download(const std::string& text, const DownloadCallback& callback);
 
    private:
