@@ -2,6 +2,7 @@
 
 #include <fmt/ostream.h>
 
+#include <QString>
 #include <functional>
 #include <set>
 
@@ -24,7 +25,8 @@ class IContentProvider {
     virtual ~IContentProvider() = default;
     virtual void load(const std::filesystem::path& inputMediaPath,
                       std::function<void(Session)> onReady) = 0;
-    virtual void prepareAudio(Sentence& sentence, std::function<void(bool success)> callback) = 0;
+    virtual void prepareAudio(Sentence& sentence,
+                              std::function<void(bool success, const QString& errorMsg)> callback) = 0;
 
     friend std::ostream& operator<<(std::ostream& os, const IContentProvider& contentProvider);
     virtual void dumpState() const = 0;
@@ -40,7 +42,8 @@ class TextContentProvider : public IContentProvider {
 
     void load(const std::filesystem::path& inputMediaPath,
               std::function<void(Session)> onReady) override;
-    void prepareAudio(Sentence& sentence, std::function<void(bool success)> callback) override;
+    void prepareAudio(Sentence& sentence,
+                      std::function<void(bool success, const QString& errorMsg)> callback) override;
 
     friend std::ostream& operator<<(std::ostream& os, const TextContentProvider& contentProvider);
     void dumpState() const override;

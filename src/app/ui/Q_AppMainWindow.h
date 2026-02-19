@@ -30,6 +30,7 @@ class Q_AppMainWindow : public QMainWindow {
     void onImportFile();
     void onExportAudio();
     void onCoreSentenceChanged(int idx);
+    void onPlaybackError(const QString& errorMsg);
 
    private:
     void setupUI();

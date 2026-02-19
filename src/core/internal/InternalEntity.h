@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
+#include <ostream>
 
 #pragma pack(push, 1)  // structure packing, force alignment to 1 byte
 
@@ -22,6 +24,24 @@ struct WAVHeader {
 
     static WAVHeader create(uint32_t sampleRate, uint16_t numChannels, uint16_t bitsPerSample,
                             uint32_t dataSize);
+    static WAVHeader read(const std::string& filename);
+    static WAVHeader read(std::istream& inputFile);
+
+    bool isValid() const;
+
+    friend std::ostream& operator<<(std::ostream& os, const WAVHeader& header);
+};
+
+struct WAV {
+    WAVHeader header;
+    std::optional<std::vector<char>> rawData;
+    std::optional<std::vector<float>> floatData;
+
+    static WAV decode(const std::string& filename);
+    static WAV decode(std::istream& inputStream);
+    static WAV resample(const WAV& wav, uint32_t newSampleRate);
+
+    friend std::ostream& operator<<(std::ostream& os, const WAV& wav);
 };
 
 // fail fast!

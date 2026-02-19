@@ -65,7 +65,7 @@ class ConfigStore {
 
     // nlohmann::json read/write is not atomic
     // import explicit mutex to avoid Race Condition
-    nlohmann::json m_config;
+    nlohmann::json m_config = nlohmann::json::object();
     mutable std::mutex m_configMutex;
 };
 

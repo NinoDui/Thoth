@@ -1,11 +1,12 @@
 # Target-3, Thoth Unit Tests
 add_executable(ThothTests
+    WAVTest.cpp
     TextParserTest.cpp
     TestRecordController.cpp
     TestLockFreeRingBuffer.cpp
     test_main.cpp
 )
-if(MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+if(MSVC)
     target_link_options(ThothTests PRIVATE /OPT:NOREF)
 endif()
 
@@ -32,7 +33,7 @@ include(CTest)
 
 # Discover and register tests with CTest
 gtest_discover_tests(ThothTests
-    DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST
+    DISCOVERY_TIMEOUT 60
     PROPERTIES
         TIMEOUT 30
 )
