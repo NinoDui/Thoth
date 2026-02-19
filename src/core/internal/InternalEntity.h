@@ -25,7 +25,7 @@ struct WAVHeader {
     static WAVHeader create(uint32_t sampleRate, uint16_t numChannels, uint16_t bitsPerSample,
                             uint32_t dataSize);
     static WAVHeader read(const std::string& filename);
-    static WAVHeader read(std::ifstream& inputFile);
+    static WAVHeader read(std::istream& inputFile);
 
     bool isValid() const;
 
@@ -38,6 +38,7 @@ struct WAV {
     std::optional<std::vector<float>> floatData;
 
     static WAV decode(const std::string& filename);
+    static WAV decode(std::istream& inputStream);
     static WAV resample(const WAV& wav, uint32_t newSampleRate);
 
     friend std::ostream& operator<<(std::ostream& os, const WAV& wav);

@@ -1,5 +1,6 @@
 # Target-3, Thoth Unit Tests
 add_executable(ThothTests
+    WAVTest.cpp
     TextParserTest.cpp
     TestRecordController.cpp
     TestLockFreeRingBuffer.cpp

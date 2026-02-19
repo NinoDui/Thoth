@@ -33,7 +33,7 @@ WAVHeader WAVHeader::read(const std::string& filename) {
     return header;
 }
 
-WAVHeader WAVHeader::read(std::ifstream& inputFile) {
+WAVHeader WAVHeader::read(std::istream& inputFile) {
     constexpr size_t targetSize = sizeof(WAVHeader);
     char buffer[targetSize];
     inputFile.read(buffer, static_cast<std::streamsize>(targetSize));
@@ -121,14 +121,9 @@ void _wavToFloat(WAV& wav) {
     }
 }
 
-WAV WAV::decode(const std::string& filename) {
-    std::ifstream inputFile(filename, std::ios::binary | std::ios::in);
-    if (!inputFile || !inputFile.is_open()) {
-        throw std::runtime_error("Failed to open file: " + filename);
-    }
-
+WAV WAV::decode(std::istream& inputStream) {
     WAV wav;
-    wav.header = WAVHeader::read(inputFile);
+    wav.header = WAVHeader::read(inputStream);
     if (!wav.header.isValid()) {
         wav.rawData = std::nullopt;
         wav.floatData = std::nullopt;
@@ -136,8 +131,8 @@ WAV WAV::decode(const std::string& filename) {
     }
 
     wav.rawData = std::vector<char>(wav.header.dataSize);
-    inputFile.read(wav.rawData->data(), static_cast<std::streamsize>(wav.header.dataSize));
-    const size_t bytesRead = static_cast<size_t>(inputFile.gcount());
+    inputStream.read(wav.rawData->data(), static_cast<std::streamsize>(wav.header.dataSize));
+    const size_t bytesRead = static_cast<size_t>(inputStream.gcount());
     if (bytesRead != wav.header.dataSize) {
         throw std::runtime_error("WAV Data reading failed, expected " +
                                  std::to_string(wav.header.dataSize) + " bytes, got " +
@@ -151,10 +146,18 @@ WAV WAV::decode(const std::string& filename) {
         LOG_ERROR("Failed to convert WAV to float: {}", e.what());
         wav.floatData = std::nullopt;
     } catch (...) {
-        LOG_CRITICAL("Unknown error occurred in converting WAV file {} to float", filename);
+        LOG_CRITICAL("Unknown error occurred in converting WAV data to float");
         wav.floatData = std::nullopt;
     }
     return wav;
+}
+
+WAV WAV::decode(const std::string& filename) {
+    std::ifstream inputFile(filename, std::ios::binary | std::ios::in);
+    if (!inputFile || !inputFile.is_open()) {
+        throw std::runtime_error("Failed to open file: " + filename);
+    }
+    return decode(inputFile);
 }
 
 WAV WAV::resample(const WAV& wav, uint32_t newSampleRate) {
