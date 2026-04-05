@@ -39,7 +39,7 @@ constexpr const char* KEY_AUDIO_RECORDER_RMS_STEP = "audio/recorder_rms_step";
 constexpr const uint8_t DEFAULT_AUDIO_RECORDER_RMS_STEP = 8;
 
 constexpr const char* KEY_WHISPER_MODEL_PATH = "whisper/model_path";
-constexpr const char* DEFAULT_WHISPER_MODEL_PATH = "models/ggml-large-v3-turbo.bin";
+constexpr const char* DEFAULT_WHISPER_MODEL_PATH = "models/ggml-base.en.bin";
 constexpr const char* KEY_WHISPER_MODEL_LANGUAGE = "whisper/model_language";
 constexpr const char* DEFAULT_WHISPER_MODEL_LANGUAGE = "en";
 constexpr const char* KEY_WHISPER_MODEL_NAME = "whisper/model_name";

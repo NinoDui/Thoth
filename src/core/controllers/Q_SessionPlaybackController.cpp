@@ -51,14 +51,20 @@ void Q_SessionPlaybackController::reset() {
 }
 
 void Q_SessionPlaybackController::play() {
-    if (m_audioPlayer->playbackState() != QMediaPlayer::PlayingState) {
-        playSentence(m_currentIdx);
-        emit sentencePlayStarted(m_currentIdx);
-        emit statusMessageChanged(QString("Playing sentence [%1]").arg(m_currentIdx));
+    if (!m_autoAdvance) {
+        // User audio is active (playing or ended at EndOfMedia).
+        // Stop it immediately and let the session take over.
+        m_audioPlayer->stop();
+    } else if (m_audioPlayer->playbackState() == QMediaPlayer::PlayingState) {
+        return;  // Session-driven playback already in progress.
     }
+    playSentence(m_currentIdx);
 }
 
+void Q_SessionPlaybackController::suspendAutoAdvance() { m_autoAdvance = false; }
+
 void Q_SessionPlaybackController::playSentence(int idx) {
+    m_autoAdvance = true;
     if (idx < 0 || idx >= static_cast<int>(m_session.sentences.size())) {
         LOG_WARN("Invalid index [{}], expected range [0, {})", idx, m_session.sentences.size());
         return;
@@ -155,6 +161,7 @@ int Q_SessionPlaybackController::currentIndex() const { return m_currentIdx; }
 bool Q_SessionPlaybackController::isActive() const { return m_active; }
 
 void Q_SessionPlaybackController::_onPlayerFinished() {
+    if (!m_autoAdvance) return;
     emit sentencePlayFinished(m_currentIdx);
 
     if (m_loopDelaySeconds > 0) {

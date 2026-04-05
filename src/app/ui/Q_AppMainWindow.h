@@ -18,6 +18,8 @@ class Q_PlaybackControlBar;
 class TextContentProvider;
 class Q_ShadowingBar;
 class Q_RecordController;
+class Q_ASRController;
+class WERScorer;
 
 class Q_AppMainWindow : public QMainWindow {
     Q_OBJECT
@@ -38,6 +40,7 @@ class Q_AppMainWindow : public QMainWindow {
     void setupControllers();
 
     void updateContentList();
+    void openSettingsDialog();
 
     QWidget* m_centralWidget;
     QLabel* m_lblStatus;
@@ -51,6 +54,8 @@ class Q_AppMainWindow : public QMainWindow {
     std::unique_ptr<Q_AudioPlayer> m_audioPlayer;
     std::unique_ptr<Q_SessionPlaybackController> m_sessionPlaybackController;
     std::unique_ptr<Q_RecordController> m_recordController;
+    std::unique_ptr<WERScorer> m_werScorer;
+    std::unique_ptr<Q_ASRController> m_asrController;
 
     Session m_currentSession;
 };
