@@ -25,6 +25,7 @@ struct Sentence {
 struct RecordedSentence : Sentence {
     std::filesystem::path localShadowingPath;
     double shadowingScore = 0.0;
+    std::optional<std::string> transcribedText;
 };
 
 class Session {

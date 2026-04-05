@@ -69,6 +69,7 @@ std::filesystem::path ConfigStore::getTempDir() const {
 std::filesystem::path ConfigStore::getConfigDir() const { return m_configPath.parent_path(); }
 std::filesystem::path ConfigStore::getCacheDir() const { return getTempDir() / "cache"; }
 std::filesystem::path ConfigStore::getLogDir() const { return getTempDir() / "log"; }
+std::filesystem::path ConfigStore::getConfigFilePath() const { return m_configPath; }
 
 ConfigStore::GoogleTTSConfig ConfigStore::getGoogleTTSConfig() const {
     std::lock_guard<std::mutex> lock(m_configMutex);

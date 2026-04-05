@@ -6,6 +6,7 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QVBoxLayout>
 
 #include "thoth/ConfigKey.h"
@@ -59,8 +60,17 @@ void Q_SettingDialog::setupUI() {
     ttsLayout->addRow("Language:", m_comboLanguage);
     ttsLayout->addRow("Voice Name:", m_comboVoice);
 
+    auto* configFileGroup = new QGroupBox("Configuration File", generalTab);
+    auto* configFileLayout = new QFormLayout(configFileGroup);
+    auto* lblConfigPath = new QLabel(
+        QString::fromStdString(ConfigStore::instance().getConfigFilePath().string()));
+    lblConfigPath->setWordWrap(true);
+    lblConfigPath->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    configFileLayout->addRow("Location:", lblConfigPath);
+
     generalLayout->addWidget(pathGroup);
     generalLayout->addWidget(ttsGroup);
+    generalLayout->addWidget(configFileGroup);
     generalLayout->addStretch();
 
     // --- Tab 2: Network ---

@@ -35,6 +35,10 @@ class Q_SessionPlaybackController : public QObject {
     // Loop control
     void setLoopSingle(bool enable, int delaySeconds = 0);
 
+    // Suspend auto-advance so an external caller can use the audio player directly
+    // without triggering playNext(). Resets automatically when playSentence() is called.
+    void suspendAutoAdvance();
+
     // Status
     [[nodiscard]] int currentIndex() const;
     [[nodiscard]] bool isActive() const;  // this controller is "driving" the mediaplayer
@@ -76,6 +80,8 @@ class Q_SessionPlaybackController : public QObject {
     std::unique_ptr<QTimer> m_loopTimer;
     bool m_singleLoop = false;
     int m_loopDelaySeconds = 0;
+
+    bool m_autoAdvance = true;
 
     static constexpr int DEFAULT_START_IDX = 0;
     static constexpr int PRELOAD_WINDOW = 3;

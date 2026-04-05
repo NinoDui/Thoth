@@ -1,8 +1,10 @@
 #include "Q_AppMainWindow.h"
 
+#include <QCoreApplication>
 #include <QFileDialog>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QProcess>
 #include <QStyle>
 
 #include "Q_PlaybackControlBar.h"
@@ -11,9 +13,11 @@
 #include "thoth/ContentProvider.h"
 #include "thoth/Entity.h"
 #include "thoth/Logger.h"
+#include "thoth/Q_ASRController.h"
 #include "thoth/Q_AudioPlayer.h"
 #include "thoth/Q_RecordController.h"
 #include "thoth/Q_SessionPlaybackController.h"
+#include "thoth/WERScorer.h"
 
 Q_AppMainWindow::Q_AppMainWindow(QWidget* parent) : QMainWindow(parent) {
     setupControllers();
@@ -33,6 +37,9 @@ void Q_AppMainWindow::setupControllers() {
     m_sessionPlaybackController = std::make_unique<Q_SessionPlaybackController>(
         m_audioPlayer.get(), m_textContentProvider.get());
     m_recordController = std::make_unique<Q_RecordController>();
+
+    m_werScorer = std::make_unique<WERScorer>();
+    m_asrController = std::make_unique<Q_ASRController>(m_werScorer.get());
 }
 
 void Q_AppMainWindow::setupUI() {
@@ -40,10 +47,7 @@ void Q_AppMainWindow::setupUI() {
     fileMenu->addAction("Import File", this, &Q_AppMainWindow::onImportFile);
 
     QAction* actSettings = fileMenu->addAction("Settings", this, [this]() {
-        Q_SettingDialog dialog(this);
-        if (dialog.exec() == QDialog::Accepted) {
-            LOG_INFO("Settings updated by the user.");
-        }
+        openSettingsDialog();
     });
 
     fileMenu->addSeparator();
@@ -96,12 +100,19 @@ void Q_AppMainWindow::setupConnections() {
     });
     connect(m_sessionPlaybackController.get(), &Q_SessionPlaybackController::sentencePlayStarted,
             this, &Q_AppMainWindow::onCoreSentenceChanged);
+    connect(m_sessionPlaybackController.get(), &Q_SessionPlaybackController::sentencePlayStarted,
+            this, [this](int) { m_playbackControlBar->setPlayingState(true); });
+    connect(m_sessionPlaybackController.get(), &Q_SessionPlaybackController::sentencePlayStopped,
+            this, [this](int) { m_playbackControlBar->setPlayingState(false); });
+    connect(m_sessionPlaybackController.get(), &Q_SessionPlaybackController::sentencePlayPaused,
+            this, [this](int) { m_playbackControlBar->setPlayingState(false); });
     connect(m_sessionPlaybackController.get(), &Q_SessionPlaybackController::errorOccurred, this,
             &Q_AppMainWindow::onPlaybackError);
 
     // connections with the shadowingBar (Shadowing Record)
     connect(m_shadowingBar, &Q_ShadowingBar::sigStartRecording, this, [this]() {
         m_sessionPlaybackController->stop();
+        m_playbackControlBar->setPlayingState(false);
 
         int idx = m_lstContent->currentRow();
         if (idx < 0 || idx >= m_lstContent->count()) {
@@ -127,6 +138,8 @@ void Q_AppMainWindow::setupConnections() {
         }
 
         m_sessionPlaybackController->stop();
+        m_sessionPlaybackController->suspendAutoAdvance();
+        m_playbackControlBar->setPlayingState(false);
         m_audioPlayer->play(path);
     });
     connect(m_recordController.get(), &Q_RecordController::updateAmplitude, m_shadowingBar,
@@ -144,8 +157,30 @@ void Q_AppMainWindow::setupConnections() {
                              m_lstContent->count());
                     return;
                 }
-                m_currentSession.recordedSentences->at(idx).localShadowingPath = path;
+                auto& rs = m_currentSession.recordedSentences->at(idx);
+                rs.localShadowingPath = path;
+                m_asrController->analyze(&rs);
             });
+
+    // ASR controller connections
+    connect(m_asrController.get(), &Q_ASRController::busyChanged, m_shadowingBar,
+            &Q_ShadowingBar::onASRAnalysisBusy);
+    connect(m_asrController.get(), &Q_ASRController::analysisReady, this,
+            [this](RecordedSentence* rs) {
+                double scorePercent = rs->shadowingScore * 100.0;
+                m_shadowingBar->onASRAnalysisReady(scorePercent);
+
+                auto* sentencesVec = &m_currentSession.recordedSentences.value();
+                int idx = static_cast<int>(rs - sentencesVec->data());
+                if (idx >= 0 && idx < m_lstContent->count()) {
+                    QString badge = QString("[%1%] ").arg(static_cast<int>(scorePercent));
+                    QString text = QString::fromStdString(m_currentSession.sentences[idx].text);
+                    m_lstContent->item(idx)->setText(
+                        QString("[%1] ").arg(idx + 1) + badge + text);
+                }
+            });
+    connect(m_asrController.get(), &Q_ASRController::errorOccurred, this,
+            [](const QString& msg) { LOG_ERROR("ASR error: {}", msg.toStdString()); });
 }
 
 void Q_AppMainWindow::onImportFile() {
@@ -169,7 +204,7 @@ void Q_AppMainWindow::onImportFile() {
             m_currentSession.recordedSentences = std::vector<RecordedSentence>();
             for (const auto& sentence : m_currentSession.sentences) {
                 m_currentSession.recordedSentences->push_back(
-                    RecordedSentence{sentence, std::filesystem::path(), 0.0});
+                    RecordedSentence{sentence, std::filesystem::path(), 0.0, std::nullopt});
             }
             m_sessionPlaybackController->setSession(m_currentSession);
             m_lblStatus->setText("Loaded " + QString::number(m_currentSession.sentences.size()) +
@@ -208,12 +243,34 @@ void Q_AppMainWindow::onPlaybackError(const QString& errorMsg) {
     msgBox.exec();
 
     if (msgBox.clickedButton() == openSettingsBtn) {
-        Q_SettingDialog dialog(this);
-        dialog.exec();
+        openSettingsDialog();
     }
 }
 
 void Q_AppMainWindow::onExportAudio() {}
+
+void Q_AppMainWindow::openSettingsDialog() {
+    Q_SettingDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted) return;
+
+    LOG_INFO("Settings saved by the user.");
+
+    QMessageBox restartBox(this);
+    restartBox.setWindowTitle("Restart Required");
+    restartBox.setText("Settings have been saved.");
+    restartBox.setInformativeText(
+        "Most changes will take effect after restarting the application.");
+    QPushButton* restartBtn =
+        restartBox.addButton("Restart Now", QMessageBox::AcceptRole);
+    restartBox.addButton("Later", QMessageBox::RejectRole);
+    restartBox.exec();
+
+    if (restartBox.clickedButton() == restartBtn) {
+        QProcess::startDetached(QCoreApplication::applicationFilePath(),
+                                QCoreApplication::arguments());
+        QCoreApplication::quit();
+    }
+}
 
 void Q_AppMainWindow::onCoreSentenceChanged(int idx) {
     if (idx < 0 || idx >= m_lstContent->count()) return;
