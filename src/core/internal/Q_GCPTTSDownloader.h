@@ -6,25 +6,19 @@
 #include <memory>
 #include <string>
 
-#include "internal/GCP.h"
+#include "thoth/ITTSEngine.h"
 
-/**
- * @brief The Q_GCPTTSDownloader class is a Qt wrapper for the GCPTextToSpeechClient class.
- * It is used to download text to speech audio from the GCP Text to Speech API.
- * This class wraps the synchronous GCPTextToSpeechClient class into a asynchronous API,
- * which is compatible with AudioManager class, a Qt-oriented class.
- */
-class Q_GCPTTSDownloader : public QObject {
+class Q_TTSDownloader : public QObject {
     Q_OBJECT
    public:
-    explicit Q_GCPTTSDownloader(QObject* parent = nullptr);
-    ~Q_GCPTTSDownloader() = default;
+    explicit Q_TTSDownloader(std::shared_ptr<thoth::ITTSEngine> engine, QObject* parent = nullptr);
+    ~Q_TTSDownloader() = default;
 
     using DownloadCallback = std::function<void(bool success, QByteArray data, QString errorMsg)>;
     void download(const std::string& text, const DownloadCallback& callback);
 
    private:
-    // shared_ptr to be compatible with Qt's asynchronous API
-    // keep the object alive until the callback is returned
-    std::shared_ptr<GCPTextToSpeechClient> m_ttsClient;
+    std::shared_ptr<thoth::ITTSEngine> m_engine;
 };
+
+using Q_GCPTTSDownloader = Q_TTSDownloader;

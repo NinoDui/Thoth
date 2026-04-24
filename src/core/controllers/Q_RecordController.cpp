@@ -7,15 +7,15 @@
 #include "internal/Q_AudioCapture.h"
 #include "internal/Q_AudioStorage.h"
 #include "internal/Timer.h"
-#include "thoth/ConfigKey.h"
-#include "thoth/ConfigStore.h"
 #include "thoth/Entity.h"
 #include "thoth/Logger.h"
 
-Q_RecordController::Q_RecordController(QObject* parent) : QObject(parent) {
-    // 1MB buffer, ~30s of audio
+Q_RecordController::Q_RecordController(const QAudioFormat& format, uint16_t rmsStep,
+                                       QObject* parent)
+    : QObject(parent),
+      m_captureProducer(std::make_unique<Q_AudioCaptureProducer>(format)),
+      m_rmsStep(rmsStep) {
     m_ringBuffer = std::make_unique<LockFreeRingBuffer>(DEFAULT_RING_BUFFER_SIZE);
-    m_captureProducer = std::make_unique<Q_AudioCaptureProducer>();
     m_streamSaver = new AudioFileStreamSaver(m_ringBuffer.get(), m_captureProducer->format());
     setupConnections();
 }
@@ -23,11 +23,12 @@ Q_RecordController::Q_RecordController(QObject* parent) : QObject(parent) {
 Q_RecordController::Q_RecordController(std::unique_ptr<Q_AudioCaptureProducer> captureProducer,
                                        AudioFileStreamSaver* streamSaver,
                                        std::unique_ptr<LockFreeRingBuffer> ringBuffer,
-                                       QObject* parent)
+                                       uint16_t rmsStep, QObject* parent)
     : QObject(parent),
       m_captureProducer(std::move(captureProducer)),
       m_streamSaver(streamSaver),
-      m_ringBuffer(std::move(ringBuffer)) {
+      m_ringBuffer(std::move(ringBuffer)),
+      m_rmsStep(rmsStep) {
     setupConnections();
 }
 
@@ -141,14 +142,10 @@ float Q_RecordController::calculateRMS(const QByteArray& buffer) {
     if (sampleCnt <= 0) return 0.0f;
 
     double sumSquares = 0.0;
-    // step is 8 by default, for calculation efficiency
-    uint16_t step = ConfigStore::instance()
-                        .getValue<uint16_t>(thoth::config::KEY_AUDIO_RECORDER_BUFFER_SIZE)
-                        .value_or(thoth::config::DEFAULT_AUDIO_RECORDER_BUFFER_SIZE);
-    for (size_t i = 0; i < sampleCnt; i += step) {
+    for (size_t i = 0; i < sampleCnt; i += m_rmsStep) {
         int16_t sample = samples[i];
         double normalizedSample = sample / calNormFactor<int16_t>();
         sumSquares += normalizedSample * normalizedSample;
     }
-    return static_cast<float>(std::sqrt(sumSquares / (sampleCnt / step)));
+    return static_cast<float>(std::sqrt(sumSquares / (sampleCnt / m_rmsStep)));
 }

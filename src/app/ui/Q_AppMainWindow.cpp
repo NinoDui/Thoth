@@ -1,15 +1,17 @@
 #include "Q_AppMainWindow.h"
 
+#include <QAudioFormat>
 #include <QCoreApplication>
 #include <QFileDialog>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QProcess>
 #include <QStyle>
 
 #include "Q_PlaybackControlBar.h"
 #include "Q_SettingDialog.h"
 #include "Q_ShadowingBar.h"
+#include "thoth/ConfigKey.h"
+#include "thoth/ConfigStore.h"
 #include "thoth/ContentProvider.h"
 #include "thoth/Entity.h"
 #include "thoth/Logger.h"
@@ -17,12 +19,16 @@
 #include "thoth/Q_AudioPlayer.h"
 #include "thoth/Q_RecordController.h"
 #include "thoth/Q_SessionPlaybackController.h"
+#include "thoth/TTSEngineFactory.h"
 #include "thoth/WERScorer.h"
 
 Q_AppMainWindow::Q_AppMainWindow(QWidget* parent) : QMainWindow(parent) {
     setupControllers();
     setupUI();
     setupConnections();
+
+    connect(&ConfigStore::instance(), &ConfigStore::configChanged, this,
+            &Q_AppMainWindow::onConfigChanged);
 
     setWindowTitle("Thoth");
     resize(800, 600);
@@ -31,24 +37,48 @@ Q_AppMainWindow::Q_AppMainWindow(QWidget* parent) : QMainWindow(parent) {
 Q_AppMainWindow::~Q_AppMainWindow() = default;
 
 void Q_AppMainWindow::setupControllers() {
-    m_textContentProvider = std::make_unique<TextContentProvider>();
+    auto& config = ConfigStore::instance();
+    auto whisperConfig = config.getWhisperConfig();
+    auto audioConfig = config.getAudioRecorderConfig();
+
+    auto ttsEngine =
+        thoth::CreateTTSEngine(config.getTTSEngineName(), "", config.getPiperModelPath().string());
+
+    auto cacheDir = config.getCacheDir() / "audio" / config.getTTSEngineName();
+    m_textContentProvider = std::make_unique<TextContentProvider>(ttsEngine, cacheDir);
     m_audioPlayer = std::make_unique<Q_AudioPlayer>();
 
     m_sessionPlaybackController = std::make_unique<Q_SessionPlaybackController>(
         m_audioPlayer.get(), m_textContentProvider.get());
-    m_recordController = std::make_unique<Q_RecordController>();
+
+    QAudioFormat recordFormat;
+    recordFormat.setSampleRate(audioConfig.sampleRate);
+    recordFormat.setChannelCount(audioConfig.channels);
+    recordFormat.setSampleFormat([](uint16_t bits) {
+        switch (bits) {
+            case 8:
+                return QAudioFormat::UInt8;
+            case 32:
+                return QAudioFormat::Int32;
+            case 64:
+                return QAudioFormat::Float;
+            default:
+                return QAudioFormat::Int16;
+        }
+    }(audioConfig.sampleFormatBits));
+
+    m_recordController = std::make_unique<Q_RecordController>(recordFormat, audioConfig.rmsStep);
 
     m_werScorer = std::make_unique<WERScorer>();
-    m_asrController = std::make_unique<Q_ASRController>(m_werScorer.get());
+    m_asrController = std::make_unique<Q_ASRController>(m_werScorer.get(), whisperConfig);
 }
 
 void Q_AppMainWindow::setupUI() {
     QMenu* fileMenu = menuBar()->addMenu("File");
     fileMenu->addAction("Import File", this, &Q_AppMainWindow::onImportFile);
 
-    QAction* actSettings = fileMenu->addAction("Settings", this, [this]() {
-        openSettingsDialog();
-    });
+    QAction* actSettings =
+        fileMenu->addAction("Settings", this, [this]() { openSettingsDialog(); });
 
     fileMenu->addSeparator();
     fileMenu->addAction("Exit", this, &Q_AppMainWindow::close);
@@ -80,7 +110,12 @@ void Q_AppMainWindow::setupUI() {
 }
 
 void Q_AppMainWindow::setupConnections() {
-    // connections with the playbackController (Audio Play)
+    setupPlaybackConnections();
+    setupRecordingConnections();
+    setupASRConnections();
+}
+
+void Q_AppMainWindow::setupPlaybackConnections() {
     connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPlay, m_sessionPlaybackController.get(),
             &Q_SessionPlaybackController::play);
     connect(m_playbackControlBar, &Q_PlaybackControlBar::sigPause,
@@ -108,8 +143,9 @@ void Q_AppMainWindow::setupConnections() {
             this, [this](int) { m_playbackControlBar->setPlayingState(false); });
     connect(m_sessionPlaybackController.get(), &Q_SessionPlaybackController::errorOccurred, this,
             &Q_AppMainWindow::onPlaybackError);
+}
 
-    // connections with the shadowingBar (Shadowing Record)
+void Q_AppMainWindow::setupRecordingConnections() {
     connect(m_shadowingBar, &Q_ShadowingBar::sigStartRecording, this, [this]() {
         m_sessionPlaybackController->stop();
         m_playbackControlBar->setPlayingState(false);
@@ -161,8 +197,9 @@ void Q_AppMainWindow::setupConnections() {
                 rs.localShadowingPath = path;
                 m_asrController->analyze(&rs);
             });
+}
 
-    // ASR controller connections
+void Q_AppMainWindow::setupASRConnections() {
     connect(m_asrController.get(), &Q_ASRController::busyChanged, m_shadowingBar,
             &Q_ShadowingBar::onASRAnalysisBusy);
     connect(m_asrController.get(), &Q_ASRController::analysisReady, this,
@@ -175,12 +212,65 @@ void Q_AppMainWindow::setupConnections() {
                 if (idx >= 0 && idx < m_lstContent->count()) {
                     QString badge = QString("[%1%] ").arg(static_cast<int>(scorePercent));
                     QString text = QString::fromStdString(m_currentSession.sentences[idx].text);
-                    m_lstContent->item(idx)->setText(
-                        QString("[%1] ").arg(idx + 1) + badge + text);
+                    m_lstContent->item(idx)->setText(QString("[%1] ").arg(idx + 1) + badge + text);
                 }
             });
     connect(m_asrController.get(), &Q_ASRController::errorOccurred, this,
             [](const QString& msg) { LOG_ERROR("ASR error: {}", msg.toStdString()); });
+}
+
+void Q_AppMainWindow::onConfigChanged(const QString& key) {
+    using namespace thoth::config;
+    std::string k = key.toStdString();
+
+    if (k == KEY_TTS_ENGINE || k == KEY_TTS_VOICE || k == KEY_TTS_LANG ||
+        k == KEY_TTS_AUDIO_ENCODING || k == KEY_TTS_PIPER_MODEL_PATH) {
+        recreateTTSEngine();
+        return;
+    }
+
+    if (k == KEY_WHISPER_MODEL_PATH || k == KEY_WHISPER_MODEL_LANGUAGE) {
+        reloadWhisperConfig();
+        return;
+    }
+
+    if (k == KEY_PROXY) {
+        auto proxy = ConfigStore::instance().getValue<std::string>(KEY_PROXY);
+        if (proxy && !proxy->empty()) {
+            QByteArray p = proxy->c_str();
+            qputenv("http_proxy", p);
+            qputenv("https_proxy", p);
+            qputenv("grpc_proxy", p);
+        }
+        return;
+    }
+}
+
+void Q_AppMainWindow::recreateTTSEngine() {
+    auto& config = ConfigStore::instance();
+    auto engine =
+        thoth::CreateTTSEngine(config.getTTSEngineName(), "", config.getPiperModelPath().string());
+
+    auto cacheDir = config.getCacheDir() / "audio" / config.getTTSEngineName();
+    m_textContentProvider = std::make_unique<TextContentProvider>(std::move(engine), cacheDir);
+
+    m_sessionPlaybackController->stop();
+    m_sessionPlaybackController = std::make_unique<Q_SessionPlaybackController>(
+        m_audioPlayer.get(), m_textContentProvider.get());
+
+    if (!m_currentSession.sentences.empty()) {
+        m_sessionPlaybackController->setSession(m_currentSession);
+    }
+
+    setupPlaybackConnections();
+
+    LOG_INFO("TTS engine recreated live");
+}
+
+void Q_AppMainWindow::reloadWhisperConfig() {
+    auto& config = ConfigStore::instance();
+    m_asrController->reloadModel(config.getWhisperConfig());
+    LOG_INFO("Whisper config reloaded live");
 }
 
 void Q_AppMainWindow::onImportFile() {
@@ -253,23 +343,7 @@ void Q_AppMainWindow::openSettingsDialog() {
     Q_SettingDialog dialog(this);
     if (dialog.exec() != QDialog::Accepted) return;
 
-    LOG_INFO("Settings saved by the user.");
-
-    QMessageBox restartBox(this);
-    restartBox.setWindowTitle("Restart Required");
-    restartBox.setText("Settings have been saved.");
-    restartBox.setInformativeText(
-        "Most changes will take effect after restarting the application.");
-    QPushButton* restartBtn =
-        restartBox.addButton("Restart Now", QMessageBox::AcceptRole);
-    restartBox.addButton("Later", QMessageBox::RejectRole);
-    restartBox.exec();
-
-    if (restartBox.clickedButton() == restartBtn) {
-        QProcess::startDetached(QCoreApplication::applicationFilePath(),
-                                QCoreApplication::arguments());
-        QCoreApplication::quit();
-    }
+    LOG_INFO("Settings applied");
 }
 
 void Q_AppMainWindow::onCoreSentenceChanged(int idx) {

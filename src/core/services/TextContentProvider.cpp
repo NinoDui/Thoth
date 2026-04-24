@@ -1,16 +1,13 @@
 #include "internal/AudioCache.h"
 #include "internal/Q_GCPTTSDownloader.h"
 #include "internal/TextParser.h"
-#include "thoth/ConfigStore.h"
 #include "thoth/ContentProvider.h"
 #include "thoth/Logger.h"
 
-TextContentProvider::TextContentProvider()
-    : m_ttsDownloader(std::make_shared<Q_GCPTTSDownloader>()),
+TextContentProvider::TextContentProvider(std::shared_ptr<thoth::ITTSEngine> engine,
+                                         const std::filesystem::path& cacheDir)
+    : m_ttsDownloader(std::make_shared<Q_TTSDownloader>(std::move(engine))),
       m_textParser(std::make_shared<TextParser>()) {
-    // Audio Cache is not Qt-based, using smartpointer
-    auto cacheBaseDir = ConfigStore::instance().getCacheDir();
-    auto cacheDir = cacheBaseDir / "audio" / ConfigStore::instance().getGoogleTTSConfig().voiceName;
     m_audioCache = std::make_unique<AudioCache>(cacheDir);
 }
 

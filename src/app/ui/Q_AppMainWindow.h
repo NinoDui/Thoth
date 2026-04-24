@@ -33,11 +33,19 @@ class Q_AppMainWindow : public QMainWindow {
     void onExportAudio();
     void onCoreSentenceChanged(int idx);
     void onPlaybackError(const QString& errorMsg);
+    void onConfigChanged(const QString& key);
 
    private:
     void setupUI();
-    void setupConnections();
     void setupControllers();
+    void setupConnections();
+
+    void setupPlaybackConnections();
+    void setupRecordingConnections();
+    void setupASRConnections();
+
+    void recreateTTSEngine();
+    void reloadWhisperConfig();
 
     void updateContentList();
     void openSettingsDialog();

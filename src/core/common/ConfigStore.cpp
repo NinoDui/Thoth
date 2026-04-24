@@ -111,6 +111,45 @@ ConfigStore::LogConfig ConfigStore::getLogConfig() const {
     };
 }
 
+thoth::AudioRecorderConfig ConfigStore::getAudioRecorderConfig() const {
+    std::lock_guard<std::mutex> lock(m_configMutex);
+    return thoth::AudioRecorderConfig{
+        .sampleRate = m_config.value<uint32_t>(thoth::config::KEY_AUDIO_RECORDER_SAMPLE_RATE,
+                                               thoth::config::DEFAULT_AUDIO_RECORDER_SAMPLE_RATE),
+        .channels = m_config.value<uint16_t>(thoth::config::KEY_AUDIO_RECORDER_CHANNELS,
+                                             thoth::config::DEFAULT_AUDIO_RECORDER_CHANNELS),
+        .sampleFormatBits =
+            m_config.value<uint16_t>(thoth::config::KEY_AUDIO_RECORDER_SAMPLE_FORMAT,
+                                     thoth::config::DEFAULT_AUDIO_RECORDER_SAMPLE_FORMAT),
+        .rmsStep = m_config.value<uint16_t>(thoth::config::KEY_AUDIO_RECORDER_RMS_STEP,
+                                            thoth::config::DEFAULT_AUDIO_RECORDER_RMS_STEP),
+        .bufferSize = m_config.value<uint32_t>(thoth::config::KEY_AUDIO_RECORDER_BUFFER_SIZE,
+                                               thoth::config::DEFAULT_AUDIO_RECORDER_BUFFER_SIZE),
+    };
+}
+
+thoth::WhisperConfig ConfigStore::getWhisperConfig() const {
+    std::lock_guard<std::mutex> lock(m_configMutex);
+    return thoth::WhisperConfig{
+        .modelPath = m_config.value<std::string>(thoth::config::KEY_WHISPER_MODEL_PATH,
+                                                 thoth::config::DEFAULT_WHISPER_MODEL_PATH),
+        .language = m_config.value<std::string>(thoth::config::KEY_WHISPER_MODEL_LANGUAGE,
+                                                thoth::config::DEFAULT_WHISPER_MODEL_LANGUAGE),
+    };
+}
+
+std::string ConfigStore::getTTSEngineName() const {
+    std::lock_guard<std::mutex> lock(m_configMutex);
+    return m_config.value<std::string>(thoth::config::KEY_TTS_ENGINE,
+                                       thoth::config::DEFAULT_TTS_ENGINE);
+}
+
+std::filesystem::path ConfigStore::getPiperModelPath() const {
+    std::lock_guard<std::mutex> lock(m_configMutex);
+    return m_config.value<std::string>(thoth::config::KEY_TTS_PIPER_MODEL_PATH,
+                                       thoth::config::DEFAULT_TTS_PIPER_MODEL_PATH);
+}
+
 std::ostream& operator<<(std::ostream& os, const ConfigStore& config) {
     os << "ConfigStore: {" << std::endl;
     os << "[temp] " << config.getTempDir().string() << std::endl;

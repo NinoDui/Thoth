@@ -4,17 +4,19 @@
 #include <QString>
 
 #include "thoth/Entity.h"
+#include "thoth/ThothConfig.h"
 
 struct whisper_context;
 
 class Q_WhisperWorker : public QObject {
     Q_OBJECT
    public:
-    explicit Q_WhisperWorker(QObject* parent = nullptr);
+    explicit Q_WhisperWorker(const thoth::WhisperConfig& config, QObject* parent = nullptr);
     ~Q_WhisperWorker();
 
    public slots:
     void doTranscribe(RecordedSentence* rs);
+    void reloadModel(const thoth::WhisperConfig& config);
 
    signals:
     void transcriptReady(RecordedSentence* rs);
@@ -25,4 +27,5 @@ class Q_WhisperWorker : public QObject {
     bool ensureContext();
 
     whisper_context* m_ctx = nullptr;
+    thoth::WhisperConfig m_config;
 };

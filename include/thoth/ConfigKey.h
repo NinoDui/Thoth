@@ -14,6 +14,11 @@ constexpr const char* DEFAULT_TTS_VOICE = "en-US-Wavenet-D";
 constexpr const char* KEY_TTS_AUDIO_ENCODING = "tts/audio_encoding";
 constexpr const char* DEFAULT_TTS_AUDIO_ENCODING = "MP3";
 
+constexpr const char* KEY_TTS_ENGINE = "tts/engine";
+constexpr const char* DEFAULT_TTS_ENGINE = "gcp";
+constexpr const char* KEY_TTS_PIPER_MODEL_PATH = "tts/piper_model_path";
+constexpr const char* DEFAULT_TTS_PIPER_MODEL_PATH = "models/piper/en_US-lessac-medium.onnx";
+
 constexpr const char* KEY_LOG_LEVEL = "log/level";
 constexpr const char* DEFAULT_LOG_LEVEL = "debug";
 constexpr const char* KEY_LOG_PATTERN = "log/pattern";

@@ -2,13 +2,17 @@
 
 #include <fmt/ostream.h>
 
+#include <QObject>
 #include <filesystem>
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 
-class ConfigStore {
+#include "thoth/ThothConfig.h"
+
+class ConfigStore : public QObject {
+    Q_OBJECT
    public:
     static ConfigStore& instance();
 
@@ -16,9 +20,12 @@ class ConfigStore {
 
     template <typename T>
     void setValue(const std::string& key, const T& value) {
-        std::lock_guard<std::mutex> lock(m_configMutex);
-        m_config[key] = value;
-        save();
+        {
+            std::lock_guard<std::mutex> lock(m_configMutex);
+            m_config[key] = value;
+            save();
+        }
+        emit configChanged(QString::fromStdString(key));
     }
 
     template <typename T>
@@ -54,6 +61,15 @@ class ConfigStore {
         std::filesystem::path logDir;
     };
     LogConfig getLogConfig() const;
+
+    thoth::AudioRecorderConfig getAudioRecorderConfig() const;
+    thoth::WhisperConfig getWhisperConfig() const;
+
+    std::string getTTSEngineName() const;
+    std::filesystem::path getPiperModelPath() const;
+
+   signals:
+    void configChanged(const QString& key);
 
    private:
     ConfigStore() = default;

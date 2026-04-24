@@ -3,11 +3,19 @@
 
 #include "internal/Q_AudioCapture.h"
 #include "internal/Utils.h"
-#include "thoth/ConfigKey.h"
-#include "thoth/ConfigStore.h"
 #include "thoth/Logger.h"
 
-Q_AudioCaptureProducer::Q_AudioCaptureProducer(QObject* parent) : QObject(parent) { initAudio(); }
+Q_AudioCaptureProducer::Q_AudioCaptureProducer(QObject* parent) : QObject(parent) {
+    m_format.setSampleRate(16000);
+    m_format.setChannelCount(1);
+    m_format.setSampleFormat(QAudioFormat::Int16);
+    initAudio();
+}
+
+Q_AudioCaptureProducer::Q_AudioCaptureProducer(const QAudioFormat& format, QObject* parent)
+    : QObject(parent), m_format(format) {
+    initAudio();
+}
 
 Q_AudioCaptureProducer::~Q_AudioCaptureProducer() { stop(); }
 
@@ -72,24 +80,6 @@ void Q_AudioCaptureProducer::_onReadyRead() {
 }
 
 void Q_AudioCaptureProducer::initAudio() {
-    // By default, use 16kHz, Mono, 16-bit, which is compatiable to OpenAI Whisper
-    m_format.setSampleRate(ConfigStore::instance()
-                               .getValue<uint32_t>(thoth::config::KEY_AUDIO_RECORDER_SAMPLE_RATE)
-                               .value_or(thoth::config::DEFAULT_AUDIO_RECORDER_SAMPLE_RATE));
-    m_format.setChannelCount(ConfigStore::instance()
-                                 .getValue<uint16_t>(thoth::config::KEY_AUDIO_RECORDER_CHANNELS)
-                                 .value_or(thoth::config::DEFAULT_AUDIO_RECORDER_CHANNELS));
-    m_format.setSampleFormat(
-        [](uint16_t value) -> QAudioFormat::SampleFormat {
-            if (value == 8) return QAudioFormat::SampleFormat::UInt8;
-            if (value == 16) return QAudioFormat::SampleFormat::Int16;
-            if (value == 32) return QAudioFormat::SampleFormat::Int32;
-            if (value == 64) return QAudioFormat::SampleFormat::Float;
-            return QAudioFormat::SampleFormat::Int16;
-        }(ConfigStore::instance()
-                               .getValue<uint16_t>(thoth::config::KEY_AUDIO_RECORDER_SAMPLE_FORMAT)
-                               .value_or(thoth::config::DEFAULT_AUDIO_RECORDER_SAMPLE_FORMAT)));
-
     QAudioDevice defaultDevice = QMediaDevices::defaultAudioInput();
     if (!defaultDevice.isFormatSupported(m_format)) {
         LOG_ERROR(
