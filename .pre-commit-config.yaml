@@ -1,0 +1,48 @@
+# See https://pre-commit.com for usage.
+# Install hooks:  pre-commit install
+# Run on all:     pre-commit run --all-files
+# Update pins:    pre-commit autoupdate
+
+exclude: |
+  (?x)^(
+    build/.*|
+    vcpkg_installed/.*|
+    third_party/.*|
+    models/.*|
+    .*/moc_[^/]*\.(cpp|h)|
+    .*/ui_[^/]*\.h|
+    .*/qrc_[^/]*\.cpp|
+    .*_autogen/.*|
+    session-.*\.md|
+    .*\.(png|jpg|jpeg|gif|pdf|wav|onnx|bin|gguf)
+  )$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-yaml
+      - id: check-json
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: destroyed-symlinks
+
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v21.1.8
+    hooks:
+      - id: clang-format
+        types_or: [c, c++]
+
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: v0.6.13
+    hooks:
+      - id: cmake-format
+      - id: cmake-lint
