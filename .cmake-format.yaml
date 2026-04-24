@@ -1,0 +1,16 @@
+format:
+  line_width: 100
+  tab_size: 4
+  use_tabchars: false
+  separate_ctrl_name_with_space: false
+  separate_fn_name_with_space: false
+  dangle_parens: true
+  max_pargs_hwrap: 4
+
+lint:
+  disabled_codes:
+    - C0103  # invalid-argument-name (many vcpkg/Qt variables are upper-case)
+    - C0301  # line-too-long (handled by format.line_width)
+  function_pattern: '[0-9a-z_]+'
+  macro_pattern: '[0-9A-Z_]+'
+  global_var_pattern: '[A-Z][0-9A-Z_]+'
