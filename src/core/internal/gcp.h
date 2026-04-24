@@ -6,14 +6,13 @@
 #include <vector>
 
 #include "google/cloud/texttospeech/v1/text_to_speech_client.h"
-
-// TODO: extend the tts service scope
+#include "thoth/ConfigStore.h"
 
 class GCPTextToSpeechClient {
    public:
-    GCPTextToSpeechClient();
-    explicit GCPTextToSpeechClient(
-        const google::cloud::texttospeech_v1::TextToSpeechClient& client);
+    explicit GCPTextToSpeechClient(const ConfigStore::GoogleTTSConfig& config);
+    explicit GCPTextToSpeechClient(const google::cloud::texttospeech_v1::TextToSpeechClient& client,
+                                   const ConfigStore::GoogleTTSConfig& config);
 
     ~GCPTextToSpeechClient() = default;
 
@@ -21,4 +20,5 @@ class GCPTextToSpeechClient {
 
    private:
     google::cloud::texttospeech_v1::TextToSpeechClient m_client;
+    ConfigStore::GoogleTTSConfig m_config;
 };

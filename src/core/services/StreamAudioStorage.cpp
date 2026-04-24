@@ -23,7 +23,6 @@ AudioFileStreamSaver::AudioFileStreamSaver(LockFreeRingBuffer* buffer, const QAu
         std::filesystem::create_directories(m_rootDir);
     }
 
-    m_file = nullptr;
     m_ioBuffer = std::vector<char>(IO_BUFFER_SIZE);
 
     m_timer = new QTimer(this);
@@ -48,7 +47,7 @@ void AudioFileStreamSaver::startSession(const std::string& sessionId) {
 #endif
     LOG_DEBUG("Creating file {} for session: {}", qPath.toStdString(), m_sessionId.toStdString());
 
-    m_file = new QFile(qPath);
+    m_file = std::make_unique<QFile>(qPath);
     if (!m_file->open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         LOG_ERROR("Failed to open file for session: {}", m_sessionId.toStdString());
         emit errorOccurred(QString("Failed to create file %1").arg(m_file->fileName()));
@@ -100,8 +99,7 @@ void AudioFileStreamSaver::_stop() {
         if (m_file->isOpen()) {
             m_file->close();
         }
-        delete m_file;
-        m_file = nullptr;
+        m_file.reset();
     }
     m_ioBuffer.clear();
     m_totalBytes = 0;

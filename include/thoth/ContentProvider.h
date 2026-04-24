@@ -3,13 +3,16 @@
 #include <fmt/ostream.h>
 
 #include <QString>
+#include <filesystem>
 #include <functional>
+#include <memory>
 #include <set>
 
 #include "thoth/Entity.h"
+#include "thoth/ITTSEngine.h"
 
 class AudioCache;
-class Q_GCPTTSDownloader;
+class Q_TTSDownloader;
 class TextParser;
 
 /**
@@ -25,8 +28,9 @@ class IContentProvider {
     virtual ~IContentProvider() = default;
     virtual void load(const std::filesystem::path& inputMediaPath,
                       std::function<void(Session)> onReady) = 0;
-    virtual void prepareAudio(Sentence& sentence,
-                              std::function<void(bool success, const QString& errorMsg)> callback) = 0;
+    virtual void prepareAudio(
+        Sentence& sentence,
+        std::function<void(bool success, const QString& errorMsg)> callback) = 0;
 
     friend std::ostream& operator<<(std::ostream& os, const IContentProvider& contentProvider);
     virtual void dumpState() const = 0;
@@ -37,7 +41,8 @@ class IContentProvider {
 
 class TextContentProvider : public IContentProvider {
    public:
-    explicit TextContentProvider();
+    explicit TextContentProvider(std::shared_ptr<thoth::ITTSEngine> engine,
+                                 const std::filesystem::path& cacheDir);
     ~TextContentProvider() override;
 
     void load(const std::filesystem::path& inputMediaPath,
@@ -51,7 +56,7 @@ class TextContentProvider : public IContentProvider {
    private:
     std::string prefix() override;
 
-    std::shared_ptr<Q_GCPTTSDownloader> m_ttsDownloader;
+    std::shared_ptr<Q_TTSDownloader> m_ttsDownloader;
     std::shared_ptr<TextParser> m_textParser;
 
     std::shared_ptr<AudioCache> m_audioCache;

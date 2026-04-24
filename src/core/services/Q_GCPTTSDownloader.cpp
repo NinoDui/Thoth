@@ -8,15 +8,12 @@
 
 using DownloadResult = QPair<QByteArray, QString>;
 
-Q_GCPTTSDownloader::Q_GCPTTSDownloader(QObject* parent)
-    : QObject(parent), m_ttsClient(std::make_shared<GCPTextToSpeechClient>()) {}
+Q_TTSDownloader::Q_TTSDownloader(std::shared_ptr<thoth::ITTSEngine> engine, QObject* parent)
+    : QObject(parent), m_engine(std::move(engine)) {}
 
-void Q_GCPTTSDownloader::download(const std::string& text, const DownloadCallback& callback) {
-    // explicitly capture the synchronous client
-    // keep it alive even the external asynchnornous calling thread is finished
-    auto clientPtr = m_ttsClient;
+void Q_TTSDownloader::download(const std::string& text, const DownloadCallback& callback) {
+    auto enginePtr = m_engine;
 
-    // QtObject, safe op to use 'new'
     auto* watcher = new QFutureWatcher<DownloadResult>(this);
     connect(watcher, &QFutureWatcher<DownloadResult>::finished, this, [watcher, callback]() {
         DownloadResult result = watcher->result();
@@ -29,13 +26,14 @@ void Q_GCPTTSDownloader::download(const std::string& text, const DownloadCallbac
         watcher->deleteLater();
     });
 
-    QFuture<DownloadResult> future = QtConcurrent::run([clientPtr, text]() -> DownloadResult {
+    QFuture<DownloadResult> future = QtConcurrent::run([enginePtr, text]() -> DownloadResult {
         try {
-            std::vector<uint8_t> audioData = clientPtr->execute(text);
-            QByteArray bytes(reinterpret_cast<const char*>(audioData.data()), audioData.size());
+            auto result = enginePtr->synthesize(text);
+            QByteArray bytes(reinterpret_cast<const char*>(result.audioData.data()),
+                             result.audioData.size());
             return {bytes, QString()};
         } catch (const std::exception& e) {
-            LOG_ERROR("GCP Text-to-Speech Error: {}", e.what());
+            LOG_ERROR("TTS synthesis error: {}", e.what());
             return {QByteArray(), QString::fromStdString(e.what())};
         }
     });

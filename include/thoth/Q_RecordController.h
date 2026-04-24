@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QAudioFormat>
 #include <QObject>
 #include <QThread>
 #include <filesystem>
@@ -13,12 +14,12 @@ class AudioFileStreamSaver;
 class Q_RecordController : public QObject {
     Q_OBJECT
    public:
-    explicit Q_RecordController(QObject* parent = nullptr);
-    // dependency injection constructor, for testing
+    explicit Q_RecordController(const QAudioFormat& format, uint16_t rmsStep = 8,
+                                QObject* parent = nullptr);
     explicit Q_RecordController(std::unique_ptr<Q_AudioCaptureProducer> captureProducer,
                                 AudioFileStreamSaver* streamSaver,
                                 std::unique_ptr<LockFreeRingBuffer> ringBuffer,
-                                QObject* parent = nullptr);
+                                uint16_t rmsStep = 8, QObject* parent = nullptr);
     ~Q_RecordController();
 
     bool startRecording(const std::string& sessionId);
@@ -50,6 +51,7 @@ class Q_RecordController : public QObject {
     void setupConnections();
 
     bool m_isRecording = false;
+    uint16_t m_rmsStep = 8;
 
     std::unique_ptr<LockFreeRingBuffer> m_ringBuffer;
     std::unique_ptr<Q_AudioCaptureProducer> m_captureProducer;

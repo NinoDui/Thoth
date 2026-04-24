@@ -3,11 +3,10 @@
 #include <whisper.h>
 
 #include "internal/InternalEntity.h"
-#include "thoth/ConfigKey.h"
-#include "thoth/ConfigStore.h"
 #include "thoth/Logger.h"
 
-Q_WhisperWorker::Q_WhisperWorker(QObject* parent) : QObject(parent) {}
+Q_WhisperWorker::Q_WhisperWorker(const thoth::WhisperConfig& config, QObject* parent)
+    : QObject(parent), m_config(config) {}
 
 Q_WhisperWorker::~Q_WhisperWorker() {
     if (m_ctx) {
@@ -19,18 +18,13 @@ Q_WhisperWorker::~Q_WhisperWorker() {
 bool Q_WhisperWorker::ensureContext() {
     if (m_ctx) return true;
 
-    auto modelPathOpt =
-        ConfigStore::instance().getValue<std::string>(thoth::config::KEY_WHISPER_MODEL_PATH);
-    std::string modelPath =
-        modelPathOpt.value_or(std::string(thoth::config::DEFAULT_WHISPER_MODEL_PATH));
-
     whisper_context_params cparams = whisper_context_default_params();
-    m_ctx = whisper_init_from_file_with_params(modelPath.c_str(), cparams);
+    m_ctx = whisper_init_from_file_with_params(m_config.modelPath.c_str(), cparams);
     if (!m_ctx) {
-        LOG_ERROR("Failed to load Whisper model from: {}", modelPath);
+        LOG_ERROR("Failed to load Whisper model from: {}", m_config.modelPath);
         return false;
     }
-    LOG_INFO("Whisper model loaded from: {}", modelPath);
+    LOG_INFO("Whisper model loaded from: {}", m_config.modelPath);
     return true;
 }
 
@@ -59,10 +53,7 @@ void Q_WhisperWorker::doTranscribe(RecordedSentence* rs) {
     }
 
     whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-    auto langOpt =
-        ConfigStore::instance().getValue<std::string>(thoth::config::KEY_WHISPER_MODEL_LANGUAGE);
-    std::string lang = langOpt.value_or(std::string(thoth::config::DEFAULT_WHISPER_MODEL_LANGUAGE));
-    wparams.language = lang.c_str();
+    wparams.language = m_config.language.c_str();
     wparams.print_progress = false;
     wparams.print_timestamps = false;
 
@@ -86,4 +77,13 @@ void Q_WhisperWorker::doTranscribe(RecordedSentence* rs) {
     LOG_DEBUG("Transcribed: \"{}\"", result);
     emit transcriptReady(rs);
     emit busyChanged(false);
+}
+
+void Q_WhisperWorker::reloadModel(const thoth::WhisperConfig& config) {
+    m_config = config;
+    if (m_ctx) {
+        whisper_free(m_ctx);
+        m_ctx = nullptr;
+        LOG_INFO("Whisper model unloaded, will reload with new config on next transcribe");
+    }
 }

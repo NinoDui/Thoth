@@ -21,6 +21,7 @@ class Q_AudioCaptureProducer : public QObject, public IAudioCaptureService {
     Q_OBJECT
    public:
     Q_AudioCaptureProducer(QObject* parent = nullptr);
+    explicit Q_AudioCaptureProducer(const QAudioFormat& format, QObject* parent = nullptr);
     ~Q_AudioCaptureProducer() override;
 
     bool start() override;

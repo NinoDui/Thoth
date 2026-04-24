@@ -49,21 +49,26 @@ void Q_SettingDialog::setupUI() {
     pathLayout->addRow("Cache Dir:", createBrowseRow("Cache", m_editCacheDir, true));
     pathLayout->addRow("Log Dir:", createBrowseRow("Log", m_editLogDir, true));
 
-    auto* ttsGroup = new QGroupBox("Google TTS", generalTab);
+    auto* ttsGroup = new QGroupBox("Text-to-Speech", generalTab);
     auto* ttsLayout = new QFormLayout(ttsGroup);
+    m_comboTTSEngine = new QComboBox();
+    m_comboTTSEngine->addItems({"gcp", "piper"});
     m_comboLanguage = new QComboBox();
     m_comboLanguage->addItems({"en-US", "zh-CN", "ja-JP"});
     m_comboVoice = new QComboBox();
     m_comboVoice->setEditable(true);
+    m_editPiperModelPath = new QLineEdit();
 
+    ttsLayout->addRow("Engine:", m_comboTTSEngine);
     ttsLayout->addRow("Credential:", createBrowseRow("GCPCred", m_editGoogleCredentialPath, false));
     ttsLayout->addRow("Language:", m_comboLanguage);
     ttsLayout->addRow("Voice Name:", m_comboVoice);
+    ttsLayout->addRow("Piper Model:", createBrowseRow("PiperModel", m_editPiperModelPath, false));
 
     auto* configFileGroup = new QGroupBox("Configuration File", generalTab);
     auto* configFileLayout = new QFormLayout(configFileGroup);
-    auto* lblConfigPath = new QLabel(
-        QString::fromStdString(ConfigStore::instance().getConfigFilePath().string()));
+    auto* lblConfigPath =
+        new QLabel(QString::fromStdString(ConfigStore::instance().getConfigFilePath().string()));
     lblConfigPath->setWordWrap(true);
     lblConfigPath->setTextInteractionFlags(Qt::TextSelectableByMouse);
     configFileLayout->addRow("Location:", lblConfigPath);
@@ -125,12 +130,21 @@ void Q_SettingDialog::loadSettings() {
         getStr(thoth::config::KEY_TTS_LANG, thoth::config::DEFAULT_TTS_LANG));
     m_comboVoice->setCurrentText(
         getStr(thoth::config::KEY_TTS_VOICE, thoth::config::DEFAULT_TTS_VOICE));
+    m_comboTTSEngine->setCurrentText(
+        getStr(thoth::config::KEY_TTS_ENGINE, thoth::config::DEFAULT_TTS_ENGINE));
+    m_editPiperModelPath->setText(getStr(thoth::config::KEY_TTS_PIPER_MODEL_PATH,
+                                         thoth::config::DEFAULT_TTS_PIPER_MODEL_PATH));
 
     m_editProxy->setText(getStr(thoth::config::KEY_PROXY));
 }
 
 void Q_SettingDialog::saveSettings() {
     auto& store = ConfigStore::instance();
+    bool needsRestart = false;
+
+    auto oldCache = store.getValue<std::string>(thoth::config::KEY_CACHE_DIR);
+    auto oldLog = store.getValue<std::string>(thoth::config::KEY_LOG_DIR);
+    auto oldSampleRate = store.getValue<uint32_t>(thoth::config::KEY_AUDIO_RECORDER_SAMPLE_RATE);
 
     store.setValue(thoth::config::KEY_CACHE_DIR, m_editCacheDir->text().toStdString());
     store.setValue(thoth::config::KEY_LOG_DIR, m_editLogDir->text().toStdString());
@@ -139,6 +153,9 @@ void Q_SettingDialog::saveSettings() {
 
     store.setValue(thoth::config::KEY_TTS_LANG, m_comboLanguage->currentText().toStdString());
     store.setValue(thoth::config::KEY_TTS_VOICE, m_comboVoice->currentText().toStdString());
+    store.setValue(thoth::config::KEY_TTS_ENGINE, m_comboTTSEngine->currentText().toStdString());
+    store.setValue(thoth::config::KEY_TTS_PIPER_MODEL_PATH,
+                   m_editPiperModelPath->text().toStdString());
 
     store.setValue(thoth::config::KEY_PROXY, m_editProxy->text().toStdString());
 
@@ -147,7 +164,6 @@ void Q_SettingDialog::saveSettings() {
         qputenv("http_proxy", proxyBytes);
         qputenv("https_proxy", proxyBytes);
         qputenv("grpc_proxy", proxyBytes);
-        LOG_INFO("Proxy settings updated dynamically.");
     }
 
     LOG_DEBUG("Settings updated, current settings: {}", store);

@@ -4,16 +4,16 @@
 #include "thoth/ISentenceScorer.h"
 #include "thoth/Logger.h"
 
-Q_ASRController::Q_ASRController(ISentenceScorer* scorer, QObject* parent)
+Q_ASRController::Q_ASRController(ISentenceScorer* scorer, const thoth::WhisperConfig& whisperConfig,
+                                 QObject* parent)
     : QObject(parent), m_scorer(scorer) {
-    m_worker = new Q_WhisperWorker();
+    m_worker = new Q_WhisperWorker(whisperConfig);
     m_workerThread = new QThread(this);
     m_worker->moveToThread(m_workerThread);
 
     connect(m_workerThread, &QThread::finished, m_worker, &QObject::deleteLater);
     connect(this, &Q_ASRController::sigTranscribe, m_worker, &Q_WhisperWorker::doTranscribe);
-    connect(m_worker, &Q_WhisperWorker::transcriptReady, this,
-            &Q_ASRController::onTranscriptReady);
+    connect(m_worker, &Q_WhisperWorker::transcriptReady, this, &Q_ASRController::onTranscriptReady);
     connect(m_worker, &Q_WhisperWorker::busyChanged, this, &Q_ASRController::busyChanged);
     connect(m_worker, &Q_WhisperWorker::errorOccurred, this, &Q_ASRController::errorOccurred);
 
@@ -25,8 +25,11 @@ Q_ASRController::~Q_ASRController() {
     m_workerThread->wait();
 }
 
-void Q_ASRController::analyze(RecordedSentence* rs) {
-    emit sigTranscribe(rs);
+void Q_ASRController::analyze(RecordedSentence* rs) { emit sigTranscribe(rs); }
+
+void Q_ASRController::reloadModel(const thoth::WhisperConfig& config) {
+    QMetaObject::invokeMethod(
+        m_worker, [this, config]() { m_worker->reloadModel(config); }, Qt::QueuedConnection);
 }
 
 void Q_ASRController::onTranscriptReady(RecordedSentence* rs) {

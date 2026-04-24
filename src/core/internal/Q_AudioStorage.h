@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -59,7 +60,7 @@ class AudioFileStreamSaver : public Q_AudioStreamConsumer {
     LockFreeRingBuffer* m_dataSource = nullptr;
     std::filesystem::path m_rootDir;
 
-    QFile* m_file;
+    std::unique_ptr<QFile> m_file;
     QString m_sessionId;
     uint64_t m_totalBytes = 0;
     QTimer* m_timer;
