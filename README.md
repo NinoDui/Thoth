@@ -116,3 +116,8 @@ ThothApp (Qt Widgets GUI)
 | nlohmann/json | Configuration |
 | GoogleTest + GMock | Testing |
 | vcpkg | Package manager (manifest mode) |
+
+## Acknowledge
+
+- Say hi to [Thoth](https://en.wikipedia.org/wiki/Thoth), amazing ancient Egyptian deity.
+- My closest friend Hongwei Sang, an outstanding AI program/product manager,
