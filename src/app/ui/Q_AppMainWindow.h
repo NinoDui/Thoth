@@ -32,6 +32,7 @@ class Q_AppMainWindow : public QMainWindow {
 
    private slots:
     void onImportFile();
+    void onImportAudio();
     void onExportAudio();
     void onCoreSentenceChanged(int idx);
     void onPlaybackError(const QString& errorMsg);
@@ -58,6 +59,7 @@ class Q_AppMainWindow : public QMainWindow {
     QListWidget* m_lstContent;
     QPlainTextEdit* m_txtInput;
     QPushButton* m_btnLoadText;
+    QPushButton* m_btnLoadAudio;
     Q_PlaybackControlBar* m_playbackControlBar;
     Q_ShadowingBar* m_shadowingBar;
 

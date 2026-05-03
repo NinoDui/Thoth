@@ -20,21 +20,18 @@ void Q_PlaybackControlBar::setupUI() {
     m_btnPrev->setObjectName("roundControlButton");
     m_btnPrev->setIcon(style()->standardIcon(QStyle::SP_MediaSkipBackward));
     m_btnPrev->setToolTip("Previous Sentence");
-    m_btnPrev->setFixedSize(44, 44);
 
     // [B] Play/Pause
     m_btnPlayPause = new QPushButton(this);
-    m_btnPlayPause->setObjectName("roundControlButton");
+    m_btnPlayPause->setObjectName("roundControlButtonPrimary");
     m_btnPlayPause->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
     m_btnPlayPause->setToolTip("Play/Pause");
-    m_btnPlayPause->setFixedSize(52, 52);
 
     // [C] Next
     m_btnNext = new QPushButton(this);
     m_btnNext->setObjectName("roundControlButton");
     m_btnNext->setIcon(style()->standardIcon(QStyle::SP_MediaSkipForward));
     m_btnNext->setToolTip("Next Sentence");
-    m_btnNext->setFixedSize(44, 44);
 
     // [single] checkbox
     m_chkLoop = new QCheckBox("SingleLoop", this);
@@ -48,19 +45,16 @@ void Q_PlaybackControlBar::setupUI() {
     m_spinDelay->setRange(0, 5 * 60);
     m_spinDelay->setSuffix("s");
     m_spinDelay->setValue(0);
-    m_spinDelay->setFixedWidth(70);
     m_spinDelay->setToolTip("Delay interval between sentences");
 
     // [rate] slider
     m_lblRate = new QLabel("1.0x", this);
     m_lblRate->setObjectName("rateBadge");
-    m_lblRate->setFixedWidth(40);
     m_lblRate->setAlignment(Qt::AlignCenter);
     m_sliderRate = new QSlider(Qt::Horizontal, this);
     m_sliderRate->setObjectName("rateSlider");
     m_sliderRate->setRange(50, 200);  // 0.5x to 2.0x
     m_sliderRate->setValue(100);
-    m_sliderRate->setFixedWidth(130);
     m_sliderRate->setToolTip("Playback speed");
 
     // [mode] combo

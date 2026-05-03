@@ -16,6 +16,7 @@
 #include "Q_PlaybackControlBar.h"
 #include "Q_SettingDialog.h"
 #include "Q_ShadowingBar.h"
+#include "StyleTokens.h"
 #include "thoth/AudioContentProvider.h"
 #include "thoth/ConfigKey.h"
 #include "thoth/ConfigStore.h"
@@ -34,7 +35,7 @@ void addSoftShadow(QWidget* widget, int blurRadius = 22, int yOffset = 8) {
     auto* shadow = new QGraphicsDropShadowEffect(widget);
     shadow->setBlurRadius(blurRadius);
     shadow->setOffset(0, yOffset);
-    shadow->setColor(QColor(32, 31, 29, 70));
+    shadow->setColor(style::kShadowColor);
     widget->setGraphicsEffect(shadow);
 }
 }  // namespace
@@ -130,6 +131,11 @@ void Q_AppMainWindow::setupUI() {
     m_btnLoadText->setObjectName("primaryPillButton");
     m_btnLoadText->setCursor(Qt::PointingHandCursor);
 
+    m_btnLoadAudio = new QPushButton("LOAD AUDIO", this);
+    m_btnLoadAudio->setObjectName("primaryPillButton");
+    m_btnLoadAudio->setCursor(Qt::PointingHandCursor);
+    connect(m_btnLoadAudio, &QPushButton::clicked, this, &Q_AppMainWindow::onImportAudio);
+
     auto* btnSettings = new QPushButton("SETTINGS", this);
     btnSettings->setObjectName("softPillButton");
     btnSettings->setCursor(Qt::PointingHandCursor);
@@ -139,6 +145,7 @@ void Q_AppMainWindow::setupUI() {
     topRow->addSpacing(8);
     topRow->addWidget(btnImportFile);
     topRow->addWidget(m_btnLoadText);
+    topRow->addWidget(m_btnLoadAudio);
     topRow->addWidget(btnSettings);
     topRow->addStretch();
 
@@ -169,7 +176,6 @@ void Q_AppMainWindow::setupUI() {
 
     m_lstContent = new QListWidget(this);
     m_lstContent->setObjectName("sentenceList");
-    m_lstContent->setFont(QFont("Segoe UI", 12));
     m_lstContent->setWordWrap(true);
     m_lstContent->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_lstContent->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -370,16 +376,16 @@ void Q_AppMainWindow::setupASRConnections() {
                     stream
                         << QString("[%1] [%2%] ").arg(idx + 1).arg(static_cast<int>(scorePercent));
                     for (const auto& t : rs->scoringDetail->alignedTokens) {
-                        QString color;
+                        const char* color = "";
                         switch (t.label) {
                             case TokenLabel::Correct:
-                                color = "#2e7d32";
+                                color = style::token::kCorrect;
                                 break;
                             case TokenLabel::Missing:
-                                color = "#c62828";
+                                color = style::token::kMissing;
                                 break;
                             case TokenLabel::Different:
-                                color = "#1565c0";
+                                color = style::token::kDifferent;
                                 break;
                             default:
                                 break;
@@ -388,7 +394,7 @@ void Q_AppMainWindow::setupASRConnections() {
                                << QString::fromStdString(t.token).toHtmlEscaped() << "</span> ";
                     }
                     if (!rs->scoringDetail->extraTokens.empty()) {
-                        stream << "<span style='color:#888888;'>(+";
+                        stream << "<span style='color:" << style::token::kExtra << ";'>(+";
                         for (size_t e = 0; e < rs->scoringDetail->extraTokens.size(); ++e) {
                             if (e > 0) {
                                 stream << " ";
@@ -519,6 +525,38 @@ void Q_AppMainWindow::onImportFile() {
         m_sessionPlaybackController->setContentProvider(m_audioContentProvider.get());
         m_audioContentProvider->load(fileName.toStdString(), onSessionReady);
     }
+}
+
+void Q_AppMainWindow::onImportAudio() {
+    QString fileName = QFileDialog::getOpenFileName(this, "Import Audio", "",
+                                                    "Audio Files (*.wav *.mp3 *.m4a *.flac)");
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    LOG_INFO("Audio file selected: {}", fileName.toStdString());
+
+    m_lblStatus->setText("Transcribing: " + QFileInfo(fileName).fileName() + " …");
+    m_sessionPlaybackController->setContentProvider(m_audioContentProvider.get());
+    m_audioContentProvider->load(fileName.toStdString(), [this](Session session) {
+        QMetaObject::invokeMethod(this, [this, session = std::move(session)]() mutable {
+            if (session.sentences.empty()) {
+                m_lblStatus->setText("Import failed — no sentences found");
+                return;
+            }
+            m_currentSession = std::move(session);
+            m_currentSession.recordedSentences = std::vector<RecordedSentence>();
+            for (const auto& sentence : m_currentSession.sentences) {
+                m_currentSession.recordedSentences->push_back(RecordedSentence{
+                    sentence, std::filesystem::path(), 0.0, std::nullopt, std::nullopt});
+            }
+            m_sessionPlaybackController->setSession(m_currentSession);
+            m_lblStatus->setText("Loaded " + QString::number(m_currentSession.sentences.size()) +
+                                 " sentences");
+            updateContentList();
+            LOG_INFO("Loaded {} sentences from audio", m_currentSession.sentences.size());
+        });
+    });
 }
 
 void Q_AppMainWindow::updateContentList() {
