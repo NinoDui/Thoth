@@ -69,6 +69,8 @@ TEST_F(RecordControllerTest, StartRecordingSuccessFlow) {
     QSignalSpy spyStart(controller.get(), &Q_RecordController::sigStartSession);
     bool res = controller->startRecording(sessionId);
 
+    spyStart.wait(500);
+
     EXPECT_TRUE(res);
     EXPECT_EQ(spyStart.count(), 1);
     EXPECT_EQ(spyStart.takeFirst().at(0).value<std::string>(), sessionId);

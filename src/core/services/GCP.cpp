@@ -57,3 +57,31 @@ std::vector<uint8_t> GCPTextToSpeechClient::execute(const std::string& text) {
 
     return std::vector<uint8_t>(response->audio_content().begin(), response->audio_content().end());
 }
+
+std::vector<thoth::GoogleVoiceInfo> GCPTextToSpeechClient::listVoices(
+    const std::string& languageCode) {
+    namespace tts = google::cloud::texttospeech::v1;
+
+    auto response = m_client.ListVoices(languageCode);
+    if (!response) {
+        auto status = std::move(response).status();
+        throw std::runtime_error("GCP ListVoices failed [Code " +
+                                 std::to_string(static_cast<int>(status.code())) +
+                                 "]: " + status.message());
+    }
+
+    std::vector<thoth::GoogleVoiceInfo> results;
+    for (const auto& v : response->voices()) {
+        thoth::GoogleVoiceInfo info;
+        info.name = v.name();
+        info.ssmlGender = tts::SsmlVoiceGender_Name(v.ssml_gender());
+        info.naturalSampleRateHertz = v.natural_sample_rate_hertz();
+        for (const auto& lc : v.language_codes()) {
+            info.languageCodes.push_back(lc);
+        }
+        results.push_back(std::move(info));
+    }
+
+    LOG_INFO("GCP ListVoices returned {} voices for language '{}'", results.size(), languageCode);
+    return results;
+}

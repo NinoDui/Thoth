@@ -24,4 +24,6 @@ thoth::TTSAudioResult PiperTTSEngine::synthesize(const std::string& text) {
 
 std::string PiperTTSEngine::engineName() const { return "Piper"; }
 
+std::string PiperTTSEngine::cacheIdentity() const { return "piper|" + m_modelPath.string(); }
+
 bool PiperTTSEngine::isAvailable() const { return m_initialized; }

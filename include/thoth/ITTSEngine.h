@@ -18,6 +18,7 @@ class ITTSEngine {
 
     virtual TTSAudioResult synthesize(const std::string& text) = 0;
     virtual std::string engineName() const = 0;
+    virtual std::string cacheIdentity() const = 0;
     virtual bool isAvailable() const = 0;
 };
 

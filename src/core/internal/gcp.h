@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "google/cloud/texttospeech/v1/text_to_speech_client.h"
-#include "thoth/ConfigStore.h"
+#include "thoth/ThothConfig.h"
 
 class GCPTextToSpeechClient {
    public:
@@ -17,6 +17,7 @@ class GCPTextToSpeechClient {
     ~GCPTextToSpeechClient() = default;
 
     std::vector<uint8_t> execute(const std::string& text);
+    std::vector<thoth::GoogleVoiceInfo> listVoices(const std::string& languageCode);
 
    private:
     google::cloud::texttospeech_v1::TextToSpeechClient m_client;
