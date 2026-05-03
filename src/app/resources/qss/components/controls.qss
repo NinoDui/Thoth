@@ -1,3 +1,4 @@
+/* ─── Default Button ─── */
 QPushButton {
     min-height: 34px;
     border: 1px solid #d4d2ca;
@@ -13,25 +14,28 @@ QPushButton:hover {
 
 QPushButton:pressed {
     background: #dfddd7;
-    padding-top: 7px;
-    padding-bottom: 5px;
+    border-color: #c0bdb6;
 }
 
-QPushButton:disabled,
-QComboBox:disabled,
-QLineEdit:disabled,
-QPlainTextEdit:disabled {
+QPushButton:disabled {
     color: #96938b;
     background: #e4e2dc;
     border-color: #dedbd3;
 }
 
+QPushButton:focus {
+    border: 2px solid #3c91e6;
+}
+
+/* ─── Primary / soft action pill buttons ─── */
 QPushButton#primaryPillButton,
 QPushButton#softPillButton {
-    min-width: 112px;
-    min-height: 38px;
-    border-radius: 19px;
+    min-width: 100px;
+    min-height: 36px;
+    border-radius: 18px;
     font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.3px;
 }
 
 QPushButton#primaryPillButton {
@@ -40,10 +44,57 @@ QPushButton#primaryPillButton {
     border: 1px solid #a9aaa7;
 }
 
-QPushButton#softPillButton {
-    background: #f0efeb;
+QPushButton#primaryPillButton:hover {
+    background: #c4c5c2;
+    border-color: #b4b5b2;
 }
 
+QPushButton#primaryPillButton:pressed {
+    background: #ababaa;
+    border-color: #9b9b99;
+}
+
+QPushButton#softPillButton {
+    background: #f0efeb;
+    border: 1px solid #d4d2ca;
+}
+
+QPushButton#softPillButton:hover {
+    background: #f8f7f3;
+    border-color: #c8c6bf;
+}
+
+/* ─── Round transport control buttons (prev / next) ─── */
+QPushButton#roundControlButton {
+    min-width:  44px;
+    max-width:  44px;
+    min-height: 44px;
+    max-height: 44px;
+    padding: 0px;
+    border-radius: 22px;
+    background: #eeede8;
+    border: 1px solid #d0cec7;
+}
+
+QPushButton#roundControlButton:hover  { background: #f7f6f2; }
+QPushButton#roundControlButton:pressed { background: #d9d7d0; }
+
+/* ─── Round primary transport button (play/pause) ─── */
+QPushButton#roundControlButtonPrimary {
+    min-width:  52px;
+    max-width:  52px;
+    min-height: 52px;
+    max-height: 52px;
+    padding: 0px;
+    border-radius: 26px;
+    background: #eeede8;
+    border: 1px solid #d0cec7;
+}
+
+QPushButton#roundControlButtonPrimary:hover  { background: #f7f6f2; }
+QPushButton#roundControlButtonPrimary:pressed { background: #d9d7d0; }
+
+/* ─── Text / combo / spin inputs ─── */
 QLineEdit,
 QPlainTextEdit,
 QComboBox,
@@ -56,16 +107,25 @@ QSpinBox {
 }
 
 QPlainTextEdit#textInput {
-    border-radius: 16px;
+    border-radius: 12px;
     padding: 12px;
 }
 
 QLineEdit:focus,
 QPlainTextEdit:focus,
 QComboBox:focus,
-QSpinBox:focus,
-QPushButton:focus {
+QSpinBox:focus {
     border: 2px solid #3c91e6;
+    padding: 6px 9px;
+}
+
+QComboBox:disabled,
+QLineEdit:disabled,
+QPlainTextEdit:disabled,
+QSpinBox:disabled {
+    color: #96938b;
+    background: #e4e2dc;
+    border-color: #dedbd3;
 }
 
 QComboBox::drop-down {
@@ -78,35 +138,57 @@ QComboBox::down-arrow {
     height: 0px;
 }
 
+/* ─── Scrollbars ─── */
 QScrollBar:vertical {
-    width: 12px;
+    width: 8px;
     background: transparent;
-    margin: 4px 2px 4px 2px;
+    margin: 2px;
 }
 
 QScrollBar::handle:vertical {
-    min-height: 34px;
-    border-radius: 5px;
+    min-height: 30px;
+    border-radius: 4px;
     background: #c7c5be;
 }
 
 QScrollBar::add-line:vertical,
-QScrollBar::sub-line:vertical {
-    height: 0px;
-}
+QScrollBar::sub-line:vertical { height: 0px; }
 
 QScrollBar:horizontal {
-    height: 12px;
+    height: 8px;
     background: transparent;
+    margin: 2px;
 }
 
 QScrollBar::handle:horizontal {
-    min-width: 34px;
-    border-radius: 5px;
+    min-width: 30px;
+    border-radius: 4px;
     background: #c7c5be;
 }
 
 QScrollBar::add-line:horizontal,
-QScrollBar::sub-line:horizontal {
-    width: 0px;
+QScrollBar::sub-line:horizontal { width: 0px; }
+
+/* ─── Loop toggle (pill-shaped checkbox indicator) ─── */
+QCheckBox#loopToggle {
+    spacing: 8px;
+    color: #4c4b47;
+    font-size: 13px;
+}
+
+QCheckBox#loopToggle::indicator {
+    width: 34px;
+    height: 18px;
+    border-radius: 9px;
+    border: 1px solid #c0bdb6;
+    background: #d8d6cf;
+}
+
+QCheckBox#loopToggle::indicator:checked {
+    background: #3c91e6;
+    border-color: #2d7ed4;
+}
+
+QCheckBox#loopToggle::indicator:hover {
+    border-color: #a8a5a0;
 }

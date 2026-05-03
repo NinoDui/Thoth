@@ -46,7 +46,6 @@ void Q_ShadowingBar::setupUI() {
 
     m_btnRecord = new QPushButton(this);
     m_btnRecord->setObjectName("btnRecord");
-    m_btnRecord->setFixedSize(40, 40);
     m_btnRecord->setCursor(Qt::PointingHandCursor);
     m_btnRecord->setToolTip("Hold or Click to Record");
 
@@ -55,7 +54,6 @@ void Q_ShadowingBar::setupUI() {
     m_visualizer->setRange(0, 100);
     m_visualizer->setValue(0);
     m_visualizer->setTextVisible(false);
-    m_visualizer->setFixedHeight(6);
 
     m_btnPlayUserAudio = new QPushButton("Play my record", this);
     m_btnPlayUserAudio->setObjectName("btnPlayUserAudio");

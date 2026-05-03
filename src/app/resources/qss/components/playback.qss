@@ -3,29 +3,16 @@ QWidget#shadowingBar {
     background: transparent;
 }
 
-QPushButton#roundControlButton {
-    min-width: 0px;
-    min-height: 0px;
-    padding: 0px;
-    border-radius: 22px;
-    background: #eeede8;
-    border: 1px solid #d0cec7;
-}
-
-QPushButton#roundControlButton:hover {
-    background: #f7f6f2;
-}
-
-QPushButton#roundControlButton:pressed {
-    background: #d9d7d0;
-}
-
+/* ─── Record button ─── */
 QPushButton#btnRecord {
-    background-color: transparent;
+    min-width:  40px;
+    max-width:  40px;
+    min-height: 40px;
+    max-height: 40px;
+    padding: 0px;
     border: 2px solid #ff3b30;
     border-radius: 20px;
-    qproperty-iconSize: 0px;
-    background-image: none;
+    background: transparent;
 }
 
 QPushButton#btnRecord[recording="false"]:hover {
@@ -34,14 +21,17 @@ QPushButton#btnRecord[recording="false"]:hover {
 
 QPushButton#btnRecord[recording="true"] {
     background-color: #ff3b30;
-    border: 2px solid #ff3b30;
+    border-color: #ff3b30;
     border-radius: 6px;
 }
 
+/* ─── Audio level visualizer ─── */
 QProgressBar#visualizer {
     border: none;
     background-color: #d8d6cf;
     border-radius: 3px;
+    min-height: 6px;
+    max-height: 6px;
 }
 
 QProgressBar#visualizer::chunk {
@@ -49,6 +39,7 @@ QProgressBar#visualizer::chunk {
     border-radius: 3px;
 }
 
+/* ─── Play user audio button ─── */
 QPushButton#btnPlayUserAudio {
     background-color: #efeee9;
     border: 1px solid #d3d1ca;
@@ -57,27 +48,43 @@ QPushButton#btnPlayUserAudio {
     padding: 5px 14px;
 }
 
+QPushButton#btnPlayUserAudio:hover {
+    background-color: #f6f5f1;
+    border-color: #c8c6bf;
+}
+
 QPushButton#btnPlayUserAudio:disabled {
     border-color: #d8d6cf;
     color: #9d9a92;
     background: #e7e5df;
 }
 
-QLabel#controlLabel,
-QLabel#rateBadge,
-QCheckBox#loopToggle {
+/* ─── Playback control labels ─── */
+QLabel#controlLabel {
     color: #4c4b47;
+    font-size: 13px;
 }
 
+/* ─── Playback rate badge ─── */
 QLabel#rateBadge {
+    color: #4c4b47;
     background: #efeee9;
     border: 1px solid #d3d1ca;
     border-radius: 12px;
-    padding: 4px 7px;
+    padding: 3px 7px;
+    font-size: 13px;
+    min-width: 40px;
+    max-width: 40px;
+}
+
+/* ─── Playback rate slider ─── */
+QSlider#rateSlider {
+    min-width: 130px;
+    max-width: 130px;
 }
 
 QSlider#rateSlider::groove:horizontal {
-    height: 7px;
+    height: 6px;
     border-radius: 3px;
     background: #d8d6cf;
 }
@@ -88,10 +95,44 @@ QSlider#rateSlider::sub-page:horizontal {
 }
 
 QSlider#rateSlider::handle:horizontal {
-    width: 20px;
-    height: 20px;
-    margin: -7px 0px;
-    border-radius: 10px;
+    width: 18px;
+    height: 18px;
+    margin: -6px 0px;
+    border-radius: 9px;
     background: #f7f6f2;
     border: 1px solid #c5c3bc;
+}
+
+QSlider#rateSlider::handle:horizontal:hover {
+    background: #ffffff;
+    border-color: #3c91e6;
+}
+
+/* ─── Delay spin box ─── */
+QSpinBox#delaySpin {
+    border-radius: 12px;
+    padding: 4px 8px;
+    min-width: 70px;
+    max-width: 70px;
+    font-size: 13px;
+}
+
+/* ─── Shadowing mode combo ─── */
+QComboBox#modeCombo {
+    border-radius: 14px;
+    padding: 5px 12px;
+    min-width: 140px;
+}
+
+/* ─── ASR analysis status labels ─── */
+QLabel#lblAnalyzing {
+    color: #4c4b47;
+    font-style: italic;
+    font-size: 13px;
+}
+
+QLabel#lblAnalysisResult {
+    color: #2e7d32;
+    font-weight: 600;
+    font-size: 13px;
 }

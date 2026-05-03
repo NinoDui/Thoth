@@ -1,8 +1,25 @@
+/* ────────────────────────────────────────────
+   Design Tokens
+
+   Palette reference:
+   bg:      #ecebe6  app background
+   surface: #eeede8  panel / card surface
+   input:   #efeee9  input & list background
+   hover:   #f7f6f2  hover state
+   pressed: #dfddd7  pressed / active state
+   muted:   #e4e2dc  disabled background
+
+   border:  #d4d2ca  default border
+   focus:   #3c91e6  focus / accent ring
+   text:    #202124  primary text
+   text2:   #4c4b47  secondary / label text
+   textDim: #96938b  disabled text
+──────────────────────────────────────────── */
+
 * {
     color: #202124;
     font-family: "SF Pro Text", "Inter", "Segoe UI", Arial, sans-serif;
     font-size: 14px;
-    letter-spacing: 0px;
 }
 
 QMainWindow,

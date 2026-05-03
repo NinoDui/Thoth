@@ -1,45 +1,54 @@
+/* ─── Content panels ─── */
 QFrame#inputPanel,
 QFrame#sequencePanel,
 QFrame#controlPanel {
     background: #ecebe6;
     border: 1px solid #d8d6cf;
-    border-radius: 8px;
+    border-radius: 12px;
 }
 
+/* ─── Screen title (INPUT) ─── */
 QLabel#screenTitle {
-    font-size: 30px;
+    font-size: 28px;
     font-weight: 700;
     color: #101010;
+    letter-spacing: -0.5px;
 }
 
+/* ─── Panel section title ─── */
 QLabel#panelTitle {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 650;
     color: #171717;
 }
 
+/* ─── Status pill badge ─── */
 QLabel#statusBadge {
-    min-height: 28px;
-    border-radius: 14px;
-    padding: 3px 14px;
+    min-height: 26px;
+    border-radius: 13px;
+    padding: 3px 12px;
     background: #f1f0ec;
     border: 1px solid #d6d4cd;
     color: #5d5a53;
+    font-size: 13px;
 }
 
+/* ─── Sentence list ─── */
 QListWidget#sentenceList {
     background-color: #efeee9;
     border: 1px solid #d3d1ca;
-    border-radius: 8px;
+    border-radius: 10px;
     outline: none;
-    padding: 6px;
+    padding: 4px;
+    font-family: "SF Pro Text", "Inter", "Segoe UI", Arial, sans-serif;
+    font-size: 13px;
 }
 
 QListWidget#sentenceList::item {
-    min-height: 42px;
+    min-height: 40px;
     border-bottom: 1px solid #dcdad3;
-    padding: 10px 12px;
-    margin: 2px;
+    padding: 8px 12px;
+    margin: 1px 2px;
     color: #333333;
 }
 
@@ -51,6 +60,6 @@ QListWidget#sentenceList::item:hover {
 QListWidget#sentenceList::item:selected {
     background-color: #dfe9f5;
     color: #171717;
-    border-left: 4px solid #3c91e6;
+    border-left: 3px solid #3c91e6;
     border-radius: 7px;
 }
