@@ -1,5 +1,6 @@
 #include "AppRunner.h"
 
+#include <QCoreApplication>
 #include <QFileDialog>
 #include <QMessageBox>
 
@@ -10,6 +11,27 @@
 #include "ui/Q_AppMainWindow.h"
 #include "ui/Q_SettingDialog.h"
 #include "ui/StyleLoader.h"
+
+namespace {
+#ifdef Q_OS_MACOS
+void resolveBundleModelPath() {
+    auto& store = ConfigStore::instance();
+    auto modelPath = store.getValue<std::string>(thoth::config::KEY_WHISPER_MODEL_PATH);
+    if (!modelPath) return;
+
+    std::filesystem::path path(*modelPath);
+    if (std::filesystem::exists(path)) return;
+
+    // Resolve relative to app bundle Resources (macOS .app packaging)
+    QString resourcesDir = QCoreApplication::applicationDirPath() + "/../Resources/";
+    std::filesystem::path bundlePath = std::filesystem::path(resourcesDir.toStdString()) / path;
+    if (std::filesystem::exists(bundlePath)) {
+        LOG_INFO("Resolved Whisper model from app bundle: {}", bundlePath.string());
+        store.setValueSilent(thoth::config::KEY_WHISPER_MODEL_PATH, bundlePath.string());
+    }
+}
+#endif
+}  // namespace
 
 AppRunner::AppRunner(int& argc, char** argv) : m_argc(argc), m_argv(argv) {
     // ConfigStore initialized, but it using the default log settings
@@ -28,6 +50,11 @@ void AppRunner::initEnv() {
     // 2. Initialize application
     m_app = std::make_unique<QApplication>(m_argc, m_argv);
     m_app->setApplicationName("Thoth");
+
+#ifdef Q_OS_MACOS
+    resolveBundleModelPath();
+#endif
+
     StyleLoader::attach();
 }
 
