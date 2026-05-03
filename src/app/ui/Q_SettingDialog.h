@@ -26,6 +26,8 @@ class Q_SettingDialog : public QDialog {
     QComboBox* m_comboVoice;
     QComboBox* m_comboTTSEngine;
     QLineEdit* m_editPiperModelPath;
+    QLineEdit* m_editWhisperModelPath;
+    QComboBox* m_comboWhisperLanguage;
 
     // Network Tab
     QLineEdit* m_editProxy;

@@ -81,15 +81,28 @@ void Q_AudioCaptureProducer::_onReadyRead() {
 
 void Q_AudioCaptureProducer::initAudio() {
     QAudioDevice defaultDevice = QMediaDevices::defaultAudioInput();
-    if (!defaultDevice.isFormatSupported(m_format)) {
+    LOG_INFO("Audio input device: '{}', requested format: {}Hz, {}ch, sampleFormat={}",
+             defaultDevice.description().toStdString(), m_format.sampleRate(),
+             m_format.channelCount(), static_cast<int>(m_format.sampleFormat()));
+
+    const bool requestedSupported = defaultDevice.isFormatSupported(m_format);
+    LOG_INFO("Device reports requested format supported: {}", requestedSupported);
+
+    if (!requestedSupported) {
         LOG_ERROR(
             "Default audio input device does not support the requested format, trying the nearest "
             "format.");
         m_format = defaultDevice.preferredFormat();
-        LOG_WARN("Using the nearest format: {}kHz, {}ch, {}bit", m_format.sampleRate(),
-                 m_format.channelCount(),
+        LOG_WARN("Falling back to preferred format: {}Hz, {}ch, sampleFormat={}, bits={}",
+                 m_format.sampleRate(), m_format.channelCount(),
+                 static_cast<int>(m_format.sampleFormat()),
                  thoth::internal::QAudioSampleFormatToBits(m_format.sampleFormat()));
     }
+
+    LOG_INFO("Negotiated capture format: {}Hz, {}ch, sampleFormat={}, bits={}",
+             m_format.sampleRate(), m_format.channelCount(),
+             static_cast<int>(m_format.sampleFormat()),
+             thoth::internal::QAudioSampleFormatToBits(m_format.sampleFormat()));
 
     m_audioSource = std::make_unique<QAudioSource>(defaultDevice, m_format);
 }

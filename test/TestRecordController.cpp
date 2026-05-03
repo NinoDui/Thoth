@@ -103,6 +103,8 @@ TEST_F(RecordControllerTest, StopRecordingSuccessFlow) {
     QSignalSpy spyStop(controller.get(), &Q_RecordController::sigStopSession);
     controller->stopRecording();
 
+    spyStop.wait(500);
+
     EXPECT_FALSE(controller->isRecording());
     EXPECT_EQ(spyStop.count(), 1);
 }

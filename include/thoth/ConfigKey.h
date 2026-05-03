@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <string_view>
 
 namespace thoth::config {
 constexpr const char* KEY_CACHE_DIR = "general/cache_dir";
@@ -50,5 +52,29 @@ constexpr const char* DEFAULT_WHISPER_MODEL_LANGUAGE = "en";
 constexpr const char* KEY_WHISPER_MODEL_NAME = "whisper/model_name";
 constexpr const char* DEFAULT_WHISPER_MODEL_NAME = "large-v3-turbo";
 
+constexpr const char* KEY_PLAYBACK_RATE = "playback/rate";
+constexpr double DEFAULT_PLAYBACK_RATE = 1.0;
+
+constexpr const char* KEY_PLAYBACK_MODE = "playback/mode";
+constexpr const char* DEFAULT_PLAYBACK_MODE = "normal";  // normal | pause-and-repeat | simultaneous
+
 constexpr const char* DEFAULT_TIME_FORMAT = "%Y%m%d%H%M%S";
+
+inline std::string DefaultVoiceForLanguage(std::string_view language) {
+    if (language == "en-US") return "en-US-Wavenet-D";
+    if (language == "sv-SE") return "sv-SE-Wavenet-A";
+    if (language == "zh-CN") return "cmn-CN-Wavenet-A";
+    if (language == "ja-JP") return "ja-JP-Wavenet-A";
+    if (language == "ko-KR") return "ko-KR-Wavenet-A";
+    return "en-US-Wavenet-D";
+}
+
+inline std::string DefaultWhisperLanguage(std::string_view language) {
+    if (language == "en-US") return "en";
+    if (language == "sv-SE") return "sv";
+    if (language == "zh-CN") return "zh";
+    if (language == "ja-JP") return "ja";
+    if (language == "ko-KR") return "ko";
+    return "en";
+}
 }  // namespace thoth::config

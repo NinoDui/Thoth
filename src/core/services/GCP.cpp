@@ -13,12 +13,12 @@
 #include "thoth/ConfigStore.h"
 #include "thoth/Logger.h"
 
-GCPTextToSpeechClient::GCPTextToSpeechClient(const ConfigStore::GoogleTTSConfig& config)
+GCPTextToSpeechClient::GCPTextToSpeechClient(const thoth::GoogleTTSConfig& config)
     : m_client(google::cloud::texttospeech_v1::MakeTextToSpeechConnection()), m_config(config) {}
 
 GCPTextToSpeechClient::GCPTextToSpeechClient(
     const google::cloud::texttospeech_v1::TextToSpeechClient& client,
-    const ConfigStore::GoogleTTSConfig& config)
+    const thoth::GoogleTTSConfig& config)
     : m_client(client), m_config(config) {}
 
 std::vector<uint8_t> GCPTextToSpeechClient::execute(const std::string& text) {

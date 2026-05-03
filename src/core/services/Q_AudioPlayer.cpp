@@ -66,6 +66,10 @@ QMediaPlayer::PlaybackState Q_AudioPlayer::playbackState() const {
     return m_player->playbackState();
 }
 
+void Q_AudioPlayer::setRate(qreal rate) { m_player->setPlaybackRate(rate); }
+
+qreal Q_AudioPlayer::rate() const { return m_player->playbackRate(); }
+
 void Q_AudioPlayer::_onMediaStatusChanged(QMediaPlayer::MediaStatus status) {
     LOG_DEBUG("Media status changed: {}", [](QMediaPlayer::MediaStatus status) -> std::string {
         switch (status) {

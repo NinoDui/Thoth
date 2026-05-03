@@ -1,6 +1,6 @@
 #include "internal/GCPTTSEngine.h"
 
-GCPTTSEngine::GCPTTSEngine(const ConfigStore::GoogleTTSConfig& config)
+GCPTTSEngine::GCPTTSEngine(const thoth::GoogleTTSConfig& config)
     : m_client(std::make_unique<GCPTextToSpeechClient>(config)), m_config(config) {}
 
 thoth::TTSAudioResult GCPTTSEngine::synthesize(const std::string& text) {

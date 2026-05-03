@@ -11,6 +11,8 @@ lint:
   disabled_codes:
     - C0103  # invalid-argument-name (many vcpkg/Qt variables are upper-case)
     - C0301  # line-too-long (handled by format.line_width)
+    - C0111  # missing-docstring-on-function (not enforced)
+    - C0113  # missing-COMMENT (not enforced)
   function_pattern: '[0-9a-z_]+'
   macro_pattern: '[0-9A-Z_]+'
   global_var_pattern: '[A-Z][0-9A-Z_]+'

@@ -34,7 +34,9 @@ void Q_ASRController::reloadModel(const thoth::WhisperConfig& config) {
 
 void Q_ASRController::onTranscriptReady(RecordedSentence* rs) {
     if (rs->transcribedText && !rs->transcribedText->empty()) {
-        rs->shadowingScore = m_scorer->score(rs->text, *rs->transcribedText);
+        auto result = m_scorer->scoreDetail(rs->text, *rs->transcribedText);
+        rs->shadowingScore = result.score;
+        rs->scoringDetail = std::move(result);
         LOG_INFO("Score for sentence [{}]: {:.2f}%", rs->id, rs->shadowingScore * 100.0);
     } else {
         rs->shadowingScore = 0.0;

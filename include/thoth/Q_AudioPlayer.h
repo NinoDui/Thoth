@@ -21,6 +21,9 @@ class Q_AudioPlayer : public QObject {
     void resume();
     void stop();
 
+    void setRate(qreal rate);
+    [[nodiscard]] qreal rate() const;
+
     [[nodiscard]] bool isPlaying() const;
     [[nodiscard]] bool isPaused() const;
     [[nodiscard]] bool isStopped() const;

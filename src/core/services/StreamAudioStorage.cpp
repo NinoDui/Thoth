@@ -3,7 +3,6 @@
 #include "internal/InternalEntity.h"
 #include "internal/LockFreeRingBuffer.h"
 #include "internal/Q_AudioStorage.h"
-#include "internal/Timer.h"
 #include "internal/Utils.h"
 #include "thoth/ConfigKey.h"
 #include "thoth/ConfigStore.h"
@@ -16,8 +15,7 @@ AudioFileStreamSaver::AudioFileStreamSaver(LockFreeRingBuffer* buffer, const QAu
     if (rootDir) {
         m_rootDir = *rootDir;
     } else {
-        m_rootDir = ConfigStore::instance().getCacheDir() / "record" /
-                    thoth::internal::getCurrentTimestamp();
+        m_rootDir = ConfigStore::instance().getCacheDir() / "record";
     }
     if (!std::filesystem::exists(m_rootDir)) {
         std::filesystem::create_directories(m_rootDir);

@@ -45,23 +45,8 @@ class ConfigStore : public QObject {
     friend std::ostream& operator<<(std::ostream& os, const ConfigStore& config);
     void dump() const;
 
-    // Specific object for mutiple possible scenarios
-    struct GoogleTTSConfig {
-        std::string languageCode;
-        std::string voiceName;
-        std::string audioEncoding;
-    };
-    GoogleTTSConfig getGoogleTTSConfig() const;
-
-    struct LogConfig {
-        std::string level;
-        std::string pattern;
-        bool toConsole;
-        bool toFile;
-        std::filesystem::path logDir;
-    };
-    LogConfig getLogConfig() const;
-
+    thoth::GoogleTTSConfig getGoogleTTSConfig() const;
+    thoth::LogConfig getLogConfig() const;
     thoth::AudioRecorderConfig getAudioRecorderConfig() const;
     thoth::WhisperConfig getWhisperConfig() const;
 

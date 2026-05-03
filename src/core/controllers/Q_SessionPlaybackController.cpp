@@ -157,12 +157,22 @@ void Q_SessionPlaybackController::setLoopSingle(bool enable, int delaySeconds) {
     m_loopDelaySeconds = delaySeconds;
 }
 
+void Q_SessionPlaybackController::setMode(const std::string& mode) { m_mode = mode; }
+
+std::string Q_SessionPlaybackController::mode() const { return m_mode; }
+
 int Q_SessionPlaybackController::currentIndex() const { return m_currentIdx; }
 bool Q_SessionPlaybackController::isActive() const { return m_active; }
 
 void Q_SessionPlaybackController::_onPlayerFinished() {
     if (!m_autoAdvance) return;
     emit sentencePlayFinished(m_currentIdx);
+
+    if (m_mode == "pause-and-repeat") {
+        m_autoAdvance = false;
+        emit repeatRequested(m_currentIdx);
+        return;
+    }
 
     if (m_loopDelaySeconds > 0) {
         // delay between current and the next play

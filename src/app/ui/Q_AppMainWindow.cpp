@@ -6,7 +6,9 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QStyle>
+#include <QTextStream>
 
+#include "HtmlDelegate.h"
 #include "Q_PlaybackControlBar.h"
 #include "Q_SettingDialog.h"
 #include "Q_ShadowingBar.h"
@@ -29,6 +31,8 @@ Q_AppMainWindow::Q_AppMainWindow(QWidget* parent) : QMainWindow(parent) {
 
     connect(&ConfigStore::instance(), &ConfigStore::configChanged, this,
             &Q_AppMainWindow::onConfigChanged);
+
+    restorePlaybackSettings();
 
     setWindowTitle("Thoth");
     resize(800, 600);
@@ -92,14 +96,27 @@ void Q_AppMainWindow::setupUI() {
     m_lblStatus = new QLabel("No file loaded", this);
     m_lblStatus->setAlignment(Qt::AlignCenter);
 
+    m_txtInput = new QPlainTextEdit(this);
+    m_txtInput->setPlaceholderText("Paste text here for shadowing practice...");
+    m_txtInput->setMaximumHeight(100);
+
+    m_btnLoadText = new QPushButton("Load Text", this);
+    m_btnLoadText->setFixedWidth(100);
+
+    auto* inputLayout = new QHBoxLayout();
+    inputLayout->addWidget(m_txtInput, 1);
+    inputLayout->addWidget(m_btnLoadText);
+
     m_lstContent = new QListWidget(this);
     m_lstContent->setObjectName("sentenceList");
     m_lstContent->setFont(QFont("Segoe UI", 12));
     m_lstContent->setWordWrap(true);
     m_lstContent->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_lstContent->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_lstContent->setItemDelegate(new HtmlDelegate(m_lstContent));
 
     mainLayout->addWidget(m_lblStatus);
+    mainLayout->addLayout(inputLayout);
     mainLayout->addWidget(m_lstContent, 1);
 
     m_playbackControlBar = new Q_PlaybackControlBar(this);
@@ -110,6 +127,30 @@ void Q_AppMainWindow::setupUI() {
 }
 
 void Q_AppMainWindow::setupConnections() {
+    connect(m_btnLoadText, &QPushButton::clicked, [this]() {
+        QString text = m_txtInput->toPlainText().trimmed();
+        if (text.isEmpty()) {
+            m_lblStatus->setText("No text entered");
+            return;
+        }
+        m_lblStatus->setText("Loading text...");
+        m_textContentProvider->loadFromText(text.toStdString(), [this](Session session) {
+            QMetaObject::invokeMethod(this, [this, session = std::move(session)]() {
+                m_currentSession = std::move(session);
+                m_currentSession.recordedSentences = std::vector<RecordedSentence>();
+                for (const auto& sentence : m_currentSession.sentences) {
+                    m_currentSession.recordedSentences->push_back(RecordedSentence{
+                        sentence, std::filesystem::path(), 0.0, std::nullopt, std::nullopt});
+                }
+                m_sessionPlaybackController->setSession(m_currentSession);
+                m_lblStatus->setText(
+                    "Loaded " + QString::number(m_currentSession.sentences.size()) + " sentences");
+                updateContentList();
+                LOG_INFO("Loaded {} sentences from text input", m_currentSession.sentences.size());
+            });
+        });
+    });
+
     setupPlaybackConnections();
     setupRecordingConnections();
     setupASRConnections();
@@ -130,6 +171,23 @@ void Q_AppMainWindow::setupPlaybackConnections() {
     connect(m_playbackControlBar, &Q_PlaybackControlBar::sigDelayChanged, [this](int value) {
         m_sessionPlaybackController->setLoopSingle(m_playbackControlBar->loopMode(), value);
     });
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigRateChanged, [this](double rate) {
+        m_audioPlayer->setRate(rate);
+        ConfigStore::instance().setValue(thoth::config::KEY_PLAYBACK_RATE, rate);
+    });
+    connect(m_playbackControlBar, &Q_PlaybackControlBar::sigModeChanged,
+            [this](const QString& mode) {
+                std::string modeStr;
+                if (mode == "Pause-and-Repeat") {
+                    modeStr = "pause-and-repeat";
+                } else if (mode == "Simultaneous") {
+                    modeStr = "simultaneous";
+                } else {
+                    modeStr = "normal";
+                }
+                m_sessionPlaybackController->setMode(modeStr);
+                ConfigStore::instance().setValue(thoth::config::KEY_PLAYBACK_MODE, modeStr);
+            });
     connect(m_lstContent, &QListWidget::itemDoubleClicked, [this](QListWidgetItem* item) {
         m_sessionPlaybackController->playSentence(item->data(Qt::UserRole).toInt());
     });
@@ -147,8 +205,11 @@ void Q_AppMainWindow::setupPlaybackConnections() {
 
 void Q_AppMainWindow::setupRecordingConnections() {
     connect(m_shadowingBar, &Q_ShadowingBar::sigStartRecording, this, [this]() {
-        m_sessionPlaybackController->stop();
-        m_playbackControlBar->setPlayingState(false);
+        bool simultaneous = m_sessionPlaybackController->mode() == "simultaneous";
+        if (!simultaneous) {
+            m_sessionPlaybackController->stop();
+            m_playbackControlBar->setPlayingState(false);
+        }
 
         int idx = m_lstContent->currentRow();
         if (idx < 0 || idx >= m_lstContent->count()) {
@@ -197,24 +258,71 @@ void Q_AppMainWindow::setupRecordingConnections() {
                 rs.localShadowingPath = path;
                 m_asrController->analyze(&rs);
             });
+
+    connect(m_sessionPlaybackController.get(), &Q_SessionPlaybackController::repeatRequested,
+            [this](int idx) {
+                m_lstContent->setCurrentRow(idx);
+                m_shadowingBar->triggerRecording();
+            });
 }
 
 void Q_AppMainWindow::setupASRConnections() {
     connect(m_asrController.get(), &Q_ASRController::busyChanged, m_shadowingBar,
             &Q_ShadowingBar::onASRAnalysisBusy);
-    connect(m_asrController.get(), &Q_ASRController::analysisReady, this,
-            [this](RecordedSentence* rs) {
-                double scorePercent = rs->shadowingScore * 100.0;
-                m_shadowingBar->onASRAnalysisReady(scorePercent);
+    connect(
+        m_asrController.get(), &Q_ASRController::analysisReady, this, [this](RecordedSentence* rs) {
+            double scorePercent = rs->shadowingScore * 100.0;
+            m_shadowingBar->onASRAnalysisReady(scorePercent);
 
-                auto* sentencesVec = &m_currentSession.recordedSentences.value();
-                int idx = static_cast<int>(rs - sentencesVec->data());
-                if (idx >= 0 && idx < m_lstContent->count()) {
-                    QString badge = QString("[%1%] ").arg(static_cast<int>(scorePercent));
-                    QString text = QString::fromStdString(m_currentSession.sentences[idx].text);
-                    m_lstContent->item(idx)->setText(QString("[%1] ").arg(idx + 1) + badge + text);
+            auto* sentencesVec = &m_currentSession.recordedSentences.value();
+            int idx = static_cast<int>(rs - sentencesVec->data());
+            if (idx >= 0 && idx < m_lstContent->count()) {
+                QString badge = QString("[%1%] ").arg(static_cast<int>(scorePercent));
+                QString text = QString("[%1] %2").arg(idx + 1).arg(
+                    QString::fromStdString(m_currentSession.sentences[idx].text));
+
+                if (rs->scoringDetail && !rs->scoringDetail->alignedTokens.empty()) {
+                    QString richText;
+                    QTextStream stream(&richText);
+                    stream
+                        << QString("[%1] [%2%] ").arg(idx + 1).arg(static_cast<int>(scorePercent));
+                    for (const auto& t : rs->scoringDetail->alignedTokens) {
+                        QString color;
+                        switch (t.label) {
+                            case TokenLabel::Correct:
+                                color = "#2e7d32";
+                                break;
+                            case TokenLabel::Missing:
+                                color = "#c62828";
+                                break;
+                            case TokenLabel::Different:
+                                color = "#1565c0";
+                                break;
+                            default:
+                                break;
+                        }
+                        stream << "<span style='color:" << color << ";'>"
+                               << QString::fromStdString(t.token).toHtmlEscaped() << "</span> ";
+                    }
+                    if (!rs->scoringDetail->extraTokens.empty()) {
+                        stream << "<span style='color:#888888;'>(+";
+                        for (size_t e = 0; e < rs->scoringDetail->extraTokens.size(); ++e) {
+                            if (e > 0) stream << " ";
+                            stream << QString::fromStdString(rs->scoringDetail->extraTokens[e])
+                                          .toHtmlEscaped();
+                        }
+                        stream << ")</span>";
+                    }
+                    m_lstContent->item(idx)->setText(richText);
+                } else {
+                    m_lstContent->item(idx)->setText(
+                        QString("[%1] [%2%] %3")
+                            .arg(idx + 1)
+                            .arg(static_cast<int>(scorePercent))
+                            .arg(QString::fromStdString(m_currentSession.sentences[idx].text)));
                 }
-            });
+            }
+        });
     connect(m_asrController.get(), &Q_ASRController::errorOccurred, this,
             [](const QString& msg) { LOG_ERROR("ASR error: {}", msg.toStdString()); });
 }
@@ -231,6 +339,14 @@ void Q_AppMainWindow::onConfigChanged(const QString& key) {
 
     if (k == KEY_WHISPER_MODEL_PATH || k == KEY_WHISPER_MODEL_LANGUAGE) {
         reloadWhisperConfig();
+        return;
+    }
+
+    if (k == KEY_PLAYBACK_RATE) {
+        auto rate = ConfigStore::instance().getValue<double>(KEY_PLAYBACK_RATE);
+        if (rate && *rate > 0.0) {
+            m_audioPlayer->setRate(*rate);
+        }
         return;
     }
 
@@ -293,8 +409,8 @@ void Q_AppMainWindow::onImportFile() {
             m_currentSession = std::move(session);
             m_currentSession.recordedSentences = std::vector<RecordedSentence>();
             for (const auto& sentence : m_currentSession.sentences) {
-                m_currentSession.recordedSentences->push_back(
-                    RecordedSentence{sentence, std::filesystem::path(), 0.0, std::nullopt});
+                m_currentSession.recordedSentences->push_back(RecordedSentence{
+                    sentence, std::filesystem::path(), 0.0, std::nullopt, std::nullopt});
             }
             m_sessionPlaybackController->setSession(m_currentSession);
             m_lblStatus->setText("Loaded " + QString::number(m_currentSession.sentences.size()) +
@@ -364,4 +480,26 @@ void Q_AppMainWindow::onCoreSentenceChanged(int idx) {
 
     m_lstContent->setCurrentRow(idx);
     m_lstContent->scrollToItem(m_lstContent->item(idx), QAbstractItemView::PositionAtCenter);
+}
+
+void Q_AppMainWindow::restorePlaybackSettings() {
+    auto& config = ConfigStore::instance();
+    auto rate = config.getValue<double>(thoth::config::KEY_PLAYBACK_RATE);
+    if (rate && *rate > 0.0) {
+        m_playbackControlBar->setPlaybackRate(*rate);
+        m_audioPlayer->setRate(*rate);
+    }
+
+    auto mode = config.getValue<std::string>(thoth::config::KEY_PLAYBACK_MODE);
+    if (mode) {
+        std::string m = *mode;
+        if (m == "pause-and-repeat") {
+            m_playbackControlBar->setDisplayMode("Pause-and-Repeat");
+        } else if (m == "simultaneous") {
+            m_playbackControlBar->setDisplayMode("Simultaneous");
+        } else {
+            m_playbackControlBar->setDisplayMode("Normal");
+        }
+        m_sessionPlaybackController->setMode(m);
+    }
 }

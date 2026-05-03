@@ -37,6 +37,28 @@ void TextContentProvider::load(const std::filesystem::path& inputMediaPath,
     }
 }
 
+void TextContentProvider::loadFromText(std::string_view text,
+                                       std::function<void(Session)> onReady) {
+    auto rawSentences = m_textParser->parseText(text);
+
+    Session session;
+    session.title = "Text Input";
+    session.inputMediaPath = prefix() + "pasted_text";
+
+    for (size_t i = 0; i < rawSentences.size(); ++i) {
+        session.sentences.push_back(Sentence{
+            .id = std::to_string(i),
+            .text = rawSentences[i],
+        });
+    }
+
+    LOG_INFO("Loaded {} sentences from pasted text", rawSentences.size());
+
+    if (onReady) {
+        onReady(session);
+    }
+}
+
 void TextContentProvider::prepareAudio(
     Sentence& sentence, std::function<void(bool success, const QString& errorMsg)> callback) {
     // 1. Check if the audio is already cached
