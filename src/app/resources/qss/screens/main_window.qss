@@ -1,0 +1,56 @@
+QFrame#inputPanel,
+QFrame#sequencePanel,
+QFrame#controlPanel {
+    background: #ecebe6;
+    border: 1px solid #d8d6cf;
+    border-radius: 8px;
+}
+
+QLabel#screenTitle {
+    font-size: 30px;
+    font-weight: 700;
+    color: #101010;
+}
+
+QLabel#panelTitle {
+    font-size: 18px;
+    font-weight: 650;
+    color: #171717;
+}
+
+QLabel#statusBadge {
+    min-height: 28px;
+    border-radius: 14px;
+    padding: 3px 14px;
+    background: #f1f0ec;
+    border: 1px solid #d6d4cd;
+    color: #5d5a53;
+}
+
+QListWidget#sentenceList {
+    background-color: #efeee9;
+    border: 1px solid #d3d1ca;
+    border-radius: 8px;
+    outline: none;
+    padding: 6px;
+}
+
+QListWidget#sentenceList::item {
+    min-height: 42px;
+    border-bottom: 1px solid #dcdad3;
+    padding: 10px 12px;
+    margin: 2px;
+    color: #333333;
+}
+
+QListWidget#sentenceList::item:hover {
+    background-color: #f7f6f2;
+    border-radius: 7px;
+}
+
+QListWidget#sentenceList::item:selected {
+    background-color: #dfe9f5;
+    color: #171717;
+    border-left: 4px solid #3c91e6;
+    border-radius: 7px;
+}

@@ -86,7 +86,9 @@ void AudioContentProvider::onTranscriptSegmentsReady(std::vector<TranscriptSegme
 }
 
 void AudioContentProvider::onAsrError(const QString& errorMsg) {
-    if (!m_pendingCallback) return;
+    if (!m_pendingCallback) {
+        return;
+    }
 
     LOG_ERROR("AudioContentProvider: transcription error: {}", errorMsg.toStdString());
     clearPending();
@@ -110,7 +112,9 @@ std::vector<Sentence> AudioContentProvider::buildSentences(
     bool hasAccum = false;
 
     auto flushAccum = [&]() {
-        if (accText.empty() || !hasAccum) return;
+        if (accText.empty() || !hasAccum) {
+            return;
+        }
         Sentence s;
         s.id = std::to_string(result.size());
         s.text = accText;
@@ -150,7 +154,9 @@ std::vector<Sentence> AudioContentProvider::buildSentences(
             }
         } else {
             std::string text = seg.text;
-            if (!text.empty() && text.front() == ' ') text.erase(0, 1);
+            if (!text.empty() && text.front() == ' ') {
+                text.erase(0, 1);
+            }
             if (text.empty()) continue;
 
             if (!hasAccum) {

@@ -58,12 +58,12 @@ class TextContentProvider : public IContentProvider {
    private:
     std::string prefix() override;
 
+    std::string m_cacheIdentity;
     std::shared_ptr<Q_TTSDownloader> m_ttsDownloader;
     std::shared_ptr<TextParser> m_textParser;
 
     std::shared_ptr<AudioCache> m_audioCache;
     std::set<std::string> m_downloadingIdx;
-    std::string m_cacheIdentity;
 };
 
 template <>

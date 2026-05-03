@@ -105,7 +105,9 @@ std::ostream& operator<<(std::ostream& os, const LockFreeRingBuffer& buffer) {
        << ", writeIdx=" << w << ", buffer=";
 
     for (size_t i = 0; i < buffer.m_buffer.size(); ++i) {
-        if (i > 0) os << ", ";
+        if (i > 0) {
+            os << ", ";
+        }
         os << static_cast<int>(buffer.m_buffer[i]);
     }
     os << ")";

@@ -19,7 +19,9 @@ Q_WhisperWorker::~Q_WhisperWorker() {
 }
 
 bool Q_WhisperWorker::ensureContext() {
-    if (m_ctx) return true;
+    if (m_ctx) {
+        return true;
+    }
 
     whisper_context_params cparams = whisper_context_default_params();
     m_ctx = whisper_init_from_file_with_params(m_config.modelPath.c_str(), cparams);
@@ -74,7 +76,9 @@ void Q_WhisperWorker::doTranscribe(RecordedSentence* rs) {
         result += whisper_full_get_segment_text(m_ctx, i);
     }
     // whisper often prepends a leading space — trim it
-    if (!result.empty() && result.front() == ' ') result.erase(0, 1);
+    if (!result.empty() && result.front() == ' ') {
+        result.erase(0, 1);
+    }
     rs->transcribedText = result;
 
     LOG_DEBUG("Transcribed: \"{}\"", result);
@@ -144,8 +148,12 @@ void Q_WhisperWorker::doTranscribeFile(const QString& audioPath) {
     int nSegments = whisper_full_n_segments(m_ctx);
     for (int i = 0; i < nSegments; ++i) {
         std::string text = whisper_full_get_segment_text(m_ctx, i);
-        if (!text.empty() && text.front() == ' ') text.erase(0, 1);
-        if (text.empty()) continue;
+        if (!text.empty() && text.front() == ' ') {
+            text.erase(0, 1);
+        }
+        if (text.empty()) {
+            continue;
+        }
 
         // whisper timestamps are in centiseconds (hundredths of a second)
         double startMs = static_cast<double>(whisper_full_get_segment_t0(m_ctx, i)) * 10.0;

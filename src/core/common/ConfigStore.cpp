@@ -36,7 +36,9 @@ void ConfigStore::init() {
         homeDir = fs::path();
     }
 #else
-    if (const char* env_p = std::getenv("HOME")) homeDir = env_p;
+    if (const char* env_p = std::getenv("HOME")) {
+        homeDir = env_p;
+    }
 #endif
     auto configDir = homeDir / ".config" / "Thoth";
     if (!fs::exists(configDir)) {
@@ -82,7 +84,9 @@ std::filesystem::path ConfigStore::getTempDir() const {
 std::filesystem::path ConfigStore::getConfigDir() const { return m_configPath.parent_path(); }
 std::filesystem::path ConfigStore::getConfiguredPathNoLock(
     const std::string& key, const std::filesystem::path& fallback) const {
-    if (!m_config.contains(key)) return fallback;
+    if (!m_config.contains(key)) {
+        return fallback;
+    }
 
     try {
         const std::string configuredPath = m_config[key].get<std::string>();

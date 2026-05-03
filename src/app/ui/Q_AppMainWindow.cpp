@@ -4,6 +4,9 @@
 #include <QCoreApplication>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFrame>
+#include <QGraphicsDropShadowEffect>
+#include <QHBoxLayout>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QStyle>
@@ -25,6 +28,16 @@
 #include "thoth/Q_SessionPlaybackController.h"
 #include "thoth/TTSEngineFactory.h"
 #include "thoth/WERScorer.h"
+
+namespace {
+void addSoftShadow(QWidget* widget, int blurRadius = 22, int yOffset = 8) {
+    auto* shadow = new QGraphicsDropShadowEffect(widget);
+    shadow->setBlurRadius(blurRadius);
+    shadow->setOffset(0, yOffset);
+    shadow->setColor(QColor(32, 31, 29, 70));
+    widget->setGraphicsEffect(shadow);
+}
+}  // namespace
 
 Q_AppMainWindow::Q_AppMainWindow(QWidget* parent) : QMainWindow(parent) {
     setupControllers();
@@ -83,31 +96,76 @@ void Q_AppMainWindow::setupUI() {
     QMenu* fileMenu = menuBar()->addMenu("File");
     fileMenu->addAction("Import File", this, &Q_AppMainWindow::onImportFile);
 
-    QAction* actSettings =
-        fileMenu->addAction("Settings", this, [this]() { openSettingsDialog(); });
+    fileMenu->addAction("Settings", this, [this]() { openSettingsDialog(); });
 
     fileMenu->addSeparator();
     fileMenu->addAction("Exit", this, &Q_AppMainWindow::close);
 
     m_centralWidget = new QWidget(this);
+    m_centralWidget->setObjectName("mainCanvas");
     setCentralWidget(m_centralWidget);
     QVBoxLayout* mainLayout = new QVBoxLayout(m_centralWidget);
-    mainLayout->setSpacing(10);
-    mainLayout->setContentsMargins(15, 15, 15, 15);
+    mainLayout->setSpacing(14);
+    mainLayout->setContentsMargins(22, 18, 22, 18);
 
-    m_lblStatus = new QLabel("No file loaded", this);
-    m_lblStatus->setAlignment(Qt::AlignCenter);
+    auto* inputPanel = new QFrame(this);
+    inputPanel->setObjectName("inputPanel");
+    addSoftShadow(inputPanel);
+    auto* inputPanelLayout = new QVBoxLayout(inputPanel);
+    inputPanelLayout->setContentsMargins(18, 14, 18, 16);
+    inputPanelLayout->setSpacing(12);
+
+    auto* topRow = new QHBoxLayout();
+    topRow->setSpacing(12);
+
+    auto* title = new QLabel("INPUT", this);
+    title->setObjectName("screenTitle");
+
+    auto* btnImportFile = new QPushButton("LOAD FILE", this);
+    btnImportFile->setObjectName("primaryPillButton");
+    btnImportFile->setCursor(Qt::PointingHandCursor);
+    connect(btnImportFile, &QPushButton::clicked, this, &Q_AppMainWindow::onImportFile);
+
+    m_btnLoadText = new QPushButton("TEXT TYPE", this);
+    m_btnLoadText->setObjectName("primaryPillButton");
+    m_btnLoadText->setCursor(Qt::PointingHandCursor);
+
+    auto* btnSettings = new QPushButton("SETTINGS", this);
+    btnSettings->setObjectName("softPillButton");
+    btnSettings->setCursor(Qt::PointingHandCursor);
+    connect(btnSettings, &QPushButton::clicked, this, &Q_AppMainWindow::openSettingsDialog);
+
+    topRow->addWidget(title);
+    topRow->addSpacing(8);
+    topRow->addWidget(btnImportFile);
+    topRow->addWidget(m_btnLoadText);
+    topRow->addWidget(btnSettings);
+    topRow->addStretch();
 
     m_txtInput = new QPlainTextEdit(this);
+    m_txtInput->setObjectName("textInput");
     m_txtInput->setPlaceholderText("Paste text here for shadowing practice...");
-    m_txtInput->setMaximumHeight(100);
+    m_txtInput->setFixedHeight(86);
 
-    m_btnLoadText = new QPushButton("Load Text", this);
-    m_btnLoadText->setFixedWidth(100);
+    inputPanelLayout->addLayout(topRow);
+    inputPanelLayout->addWidget(m_txtInput);
 
-    auto* inputLayout = new QHBoxLayout();
-    inputLayout->addWidget(m_txtInput, 1);
-    inputLayout->addWidget(m_btnLoadText);
+    auto* sequencePanel = new QFrame(this);
+    sequencePanel->setObjectName("sequencePanel");
+    addSoftShadow(sequencePanel, 24, 9);
+    auto* sequenceLayout = new QVBoxLayout(sequencePanel);
+    sequenceLayout->setContentsMargins(16, 14, 16, 16);
+    sequenceLayout->setSpacing(10);
+
+    auto* sequenceHeader = new QHBoxLayout();
+    auto* sequenceTitle = new QLabel("sentence sequence", this);
+    sequenceTitle->setObjectName("panelTitle");
+    m_lblStatus = new QLabel("No file loaded", this);
+    m_lblStatus->setObjectName("statusBadge");
+    m_lblStatus->setAlignment(Qt::AlignCenter);
+    sequenceHeader->addWidget(sequenceTitle);
+    sequenceHeader->addStretch();
+    sequenceHeader->addWidget(m_lblStatus);
 
     m_lstContent = new QListWidget(this);
     m_lstContent->setObjectName("sentenceList");
@@ -117,15 +175,25 @@ void Q_AppMainWindow::setupUI() {
     m_lstContent->setSelectionMode(QAbstractItemView::SingleSelection);
     m_lstContent->setItemDelegate(new HtmlDelegate(m_lstContent));
 
-    mainLayout->addWidget(m_lblStatus);
-    mainLayout->addLayout(inputLayout);
-    mainLayout->addWidget(m_lstContent, 1);
+    sequenceLayout->addLayout(sequenceHeader);
+    sequenceLayout->addWidget(m_lstContent, 1);
+
+    auto* controlPanel = new QFrame(this);
+    controlPanel->setObjectName("controlPanel");
+    addSoftShadow(controlPanel);
+    auto* controlLayout = new QHBoxLayout(controlPanel);
+    controlLayout->setContentsMargins(16, 12, 16, 12);
+    controlLayout->setSpacing(14);
 
     m_playbackControlBar = new Q_PlaybackControlBar(this);
-    mainLayout->addWidget(m_playbackControlBar);
-
     m_shadowingBar = new Q_ShadowingBar(this);
-    mainLayout->addWidget(m_shadowingBar);
+
+    controlLayout->addWidget(m_shadowingBar, 2);
+    controlLayout->addWidget(m_playbackControlBar, 3);
+
+    mainLayout->addWidget(inputPanel);
+    mainLayout->addWidget(sequencePanel, 1);
+    mainLayout->addWidget(controlPanel);
 }
 
 void Q_AppMainWindow::setupConnections() {
@@ -322,7 +390,9 @@ void Q_AppMainWindow::setupASRConnections() {
                     if (!rs->scoringDetail->extraTokens.empty()) {
                         stream << "<span style='color:#888888;'>(+";
                         for (size_t e = 0; e < rs->scoringDetail->extraTokens.size(); ++e) {
-                            if (e > 0) stream << " ";
+                            if (e > 0) {
+                                stream << " ";
+                            }
                             stream << QString::fromStdString(rs->scoringDetail->extraTokens[e])
                                           .toHtmlEscaped();
                         }
@@ -487,13 +557,17 @@ void Q_AppMainWindow::onExportAudio() {}
 
 void Q_AppMainWindow::openSettingsDialog() {
     Q_SettingDialog dialog(this);
-    if (dialog.exec() != QDialog::Accepted) return;
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
 
     LOG_INFO("Settings applied");
 }
 
 void Q_AppMainWindow::onCoreSentenceChanged(int idx) {
-    if (idx < 0 || idx >= m_lstContent->count()) return;
+    if (idx < 0 || idx >= m_lstContent->count()) {
+        return;
+    }
 
     if (m_lastHighlightedIdx >= 0 && m_lastHighlightedIdx < m_lstContent->count()) {
         QListWidgetItem* prevItem = m_lstContent->item(m_lastHighlightedIdx);

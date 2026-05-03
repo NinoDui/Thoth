@@ -1,0 +1,44 @@
+* {
+    color: #202124;
+    font-family: "SF Pro Text", "Inter", "Segoe UI", Arial, sans-serif;
+    font-size: 14px;
+    letter-spacing: 0px;
+}
+
+QMainWindow,
+QDialog,
+QWidget#mainCanvas {
+    background: #ecebe6;
+}
+
+QMenuBar {
+    background: #ecebe6;
+    color: #202124;
+    padding: 4px 8px;
+}
+
+QMenuBar::item {
+    background: transparent;
+    border-radius: 6px;
+    padding: 5px 10px;
+}
+
+QMenuBar::item:selected {
+    background: #deddd8;
+}
+
+QMenu {
+    background: #eeede8;
+    border: 1px solid #d4d2ca;
+    border-radius: 8px;
+    padding: 6px;
+}
+
+QMenu::item {
+    padding: 7px 22px;
+    border-radius: 6px;
+}
+
+QMenu::item:selected {
+    background: #d9d8d3;
+}

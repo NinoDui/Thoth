@@ -119,7 +119,9 @@ void AudioFileStreamSaver::_drainBufferToFile() {
         size_t readBytes = m_dataSource->read(m_ioBuffer.data(), m_ioBuffer.size());
         LOG_TRACE("Read {} bytes from the ring buffer, current buffer size: {} / {}", readBytes,
                   m_dataSource->size(), m_dataSource->capacity());
-        if (readBytes == 0) break;
+        if (readBytes == 0) {
+            break;
+        }
 
         uint64_t writtenBytes = m_file->write(m_ioBuffer.data(), readBytes);
         if (writtenBytes > 0) {

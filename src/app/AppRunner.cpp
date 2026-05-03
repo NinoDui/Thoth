@@ -53,7 +53,9 @@ bool AppRunner::authenticate() {
                                  "Please select the Google Credential File for your account.");
         QString fileName = QFileDialog::getOpenFileName(nullptr, "Select Credential", "",
                                                         "Credential Files (*.json)");
-        if (fileName.isEmpty()) return {};
+        if (fileName.isEmpty()) {
+            return {};
+        }
         return std::filesystem::path(fileName.toStdString());
     };
     // not set login callback for now, skip this step

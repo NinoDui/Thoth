@@ -1,0 +1,112 @@
+QPushButton {
+    min-height: 34px;
+    border: 1px solid #d4d2ca;
+    border-radius: 17px;
+    padding: 6px 16px;
+    background: #eeede8;
+}
+
+QPushButton:hover {
+    background: #f6f5f1;
+    border-color: #c8c6bf;
+}
+
+QPushButton:pressed {
+    background: #dfddd7;
+    padding-top: 7px;
+    padding-bottom: 5px;
+}
+
+QPushButton:disabled,
+QComboBox:disabled,
+QLineEdit:disabled,
+QPlainTextEdit:disabled {
+    color: #96938b;
+    background: #e4e2dc;
+    border-color: #dedbd3;
+}
+
+QPushButton#primaryPillButton,
+QPushButton#softPillButton {
+    min-width: 112px;
+    min-height: 38px;
+    border-radius: 19px;
+    font-weight: 600;
+}
+
+QPushButton#primaryPillButton {
+    color: #171717;
+    background: #b9bab7;
+    border: 1px solid #a9aaa7;
+}
+
+QPushButton#softPillButton {
+    background: #f0efeb;
+}
+
+QLineEdit,
+QPlainTextEdit,
+QComboBox,
+QSpinBox {
+    background: #efeee9;
+    border: 1px solid #d3d1ca;
+    border-radius: 15px;
+    selection-background-color: #3c91e6;
+    padding: 7px 10px;
+}
+
+QPlainTextEdit#textInput {
+    border-radius: 16px;
+    padding: 12px;
+}
+
+QLineEdit:focus,
+QPlainTextEdit:focus,
+QComboBox:focus,
+QSpinBox:focus,
+QPushButton:focus {
+    border: 2px solid #3c91e6;
+}
+
+QComboBox::drop-down {
+    width: 28px;
+    border: none;
+}
+
+QComboBox::down-arrow {
+    width: 0px;
+    height: 0px;
+}
+
+QScrollBar:vertical {
+    width: 12px;
+    background: transparent;
+    margin: 4px 2px 4px 2px;
+}
+
+QScrollBar::handle:vertical {
+    min-height: 34px;
+    border-radius: 5px;
+    background: #c7c5be;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    height: 12px;
+    background: transparent;
+}
+
+QScrollBar::handle:horizontal {
+    min-width: 34px;
+    border-radius: 5px;
+    background: #c7c5be;
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    width: 0px;
+}

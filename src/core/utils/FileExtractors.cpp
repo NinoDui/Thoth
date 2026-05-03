@@ -31,14 +31,20 @@ std::unique_ptr<FileExtractor> createFileExtractor(const std::string& input_form
     std::transform(format.begin(), format.end(), format.begin(),
                    [](unsigned char c) { return std::tolower(c); });
 
-    if (format == "txt") return std::make_unique<TxtExtractor>();
-    if (format == "pdf") return std::make_unique<PdfExtractor>();
+    if (format == "txt") {
+        return std::make_unique<TxtExtractor>();
+    }
+    if (format == "pdf") {
+        return std::make_unique<PdfExtractor>();
+    }
     throw std::invalid_argument("Unsupported file format: " + format);
 }
 
 std::unique_ptr<FileExtractor> createFileExtractor(const std::filesystem::path& path) {
     std::string format = path.extension().string();
-    if (format.starts_with(".")) format = format.substr(1);
+    if (format.starts_with(".")) {
+        format = format.substr(1);
+    }
 
     return createFileExtractor(format);
 }

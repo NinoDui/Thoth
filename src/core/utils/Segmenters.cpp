@@ -4,7 +4,9 @@
 
 Sentences RegexSegmenter::segment(std::string_view text) const {
     Sentences sentences;
-    if (text.empty()) return sentences;
+    if (text.empty()) {
+        return sentences;
+    }
 
     std::regex re(R"([.?!\n]\s+|$)");
 
@@ -30,7 +32,9 @@ bool RegexSegmenter::isValidSentence(const std::string& raw) const {
             break;
         }
     }
-    if (isAllNumbers) return false;
+    if (isAllNumbers) {
+        return false;
+    }
 
     // Case 2, all .!?, -> False
     bool isAllPunctuation = true;
@@ -40,7 +44,9 @@ bool RegexSegmenter::isValidSentence(const std::string& raw) const {
             break;
         }
     }
-    if (isAllPunctuation) return false;
+    if (isAllPunctuation) {
+        return false;
+    }
 
     return true;
 }

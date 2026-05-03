@@ -19,10 +19,18 @@ constexpr const char* kTtsLanguages[] = {"English (en-US)", "Swedish (sv-SE)", "
                                          "Korean (ko-KR)"};
 
 std::string languageCodeFromDisplay(const QString& display) {
-    if (display.startsWith("English")) return "en-US";
-    if (display.startsWith("Swedish")) return "sv-SE";
-    if (display.startsWith("Japanese")) return "ja-JP";
-    if (display.startsWith("Korean")) return "ko-KR";
+    if (display.startsWith("English")) {
+        return "en-US";
+    }
+    if (display.startsWith("Swedish")) {
+        return "sv-SE";
+    }
+    if (display.startsWith("Japanese")) {
+        return "ja-JP";
+    }
+    if (display.startsWith("Korean")) {
+        return "ko-KR";
+    }
     return "en-US";
 }
 }  // namespace
@@ -54,7 +62,9 @@ void Q_SettingDialog::setupUI() {
         connect(btn, &QPushButton::clicked, [this, lineEdit, isDir]() {
             QString path = isDir ? QFileDialog::getExistingDirectory(this, "Select Directory")
                                  : QFileDialog::getOpenFileName(this, "Select File");
-            if (!path.isEmpty()) lineEdit->setText(path);
+            if (!path.isEmpty()) {
+                lineEdit->setText(path);
+            }
         });
         auto* rowLayout = new QHBoxLayout();
         rowLayout->addWidget(lineEdit);
@@ -192,7 +202,9 @@ void Q_SettingDialog::loadSettings() {
     std::string savedLang =
         getStr(thoth::config::KEY_TTS_LANG, thoth::config::DEFAULT_TTS_LANG).toStdString();
     int langIdx = m_comboLanguage->findText(QString::fromStdString(savedLang), Qt::MatchContains);
-    if (langIdx >= 0) m_comboLanguage->setCurrentIndex(langIdx);
+    if (langIdx >= 0) {
+        m_comboLanguage->setCurrentIndex(langIdx);
+    }
 
     m_comboVoice->setCurrentText(
         getStr(thoth::config::KEY_TTS_VOICE, thoth::config::DEFAULT_TTS_VOICE));
@@ -267,9 +279,13 @@ void Q_SettingDialog::loadVoicesForLanguage(const std::string& languageCode) {
         connect(
             m_voiceLoader.get(), &Q_GCPVoiceLoader::voicesReady, this,
             [this](const std::string& langCode, const std::vector<thoth::GoogleVoiceInfo>& voices) {
-                if (langCode != languageCodeFromDisplay(m_comboLanguage->currentText())) return;
+                if (langCode != languageCodeFromDisplay(m_comboLanguage->currentText())) {
+                    return;
+                }
 
-                if (voices.empty()) return;
+                if (voices.empty()) {
+                    return;
+                }
 
                 m_loadedVoices = voices;
                 m_loadedLanguage = langCode;
@@ -279,7 +295,9 @@ void Q_SettingDialog::loadVoicesForLanguage(const std::string& languageCode) {
                 for (const auto& v : voices) {
                     QString name = QString::fromStdString(v.name);
                     m_comboVoice->addItem(name);
-                    if (name == savedVoice) savedFound = true;
+                    if (name == savedVoice) {
+                        savedFound = true;
+                    }
                 }
                 if (savedFound) {
                     m_comboVoice->setCurrentText(savedVoice);
@@ -289,7 +307,9 @@ void Q_SettingDialog::loadVoicesForLanguage(const std::string& languageCode) {
             });
         connect(m_voiceLoader.get(), &Q_GCPVoiceLoader::loadError, this,
                 [this](const std::string& langCode, const QString& errorMsg) {
-                    if (langCode != languageCodeFromDisplay(m_comboLanguage->currentText())) return;
+                    if (langCode != languageCodeFromDisplay(m_comboLanguage->currentText())) {
+                        return;
+                    }
                     LOG_WARN("Voice loading failed for language '{}': {}", langCode,
                              errorMsg.toStdString());
                 });

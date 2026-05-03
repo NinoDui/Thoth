@@ -162,8 +162,12 @@ WAV WAV::decode(const std::string& filename) {
 }
 
 WAV WAV::resample(const WAV& wav, uint32_t newSampleRate) {
-    if (wav.header.sampleRate == newSampleRate) return wav;
-    if (!wav.floatData || wav.floatData->empty()) return WAV();
+    if (wav.header.sampleRate == newSampleRate) {
+        return wav;
+    }
+    if (!wav.floatData || wav.floatData->empty()) {
+        return WAV();
+    }
 
     const double ratio = static_cast<double>(wav.header.sampleRate) / newSampleRate;
     const size_t srcSize = wav.floatData->size();
