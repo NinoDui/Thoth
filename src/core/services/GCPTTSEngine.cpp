@@ -7,7 +7,9 @@ thoth::TTSAudioResult GCPTTSEngine::synthesize(const std::string& text) {
     auto rawBytes = m_client->execute(text);
     std::string format = m_config.audioEncoding;
     for (auto& c : format) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    if (format == "linear16") format = "wav";
+    if (format == "linear16") {
+        format = "wav";
+    }
     return thoth::TTSAudioResult{
         .audioData = rawBytes,
         .format = format,

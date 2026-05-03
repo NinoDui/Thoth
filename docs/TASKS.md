@@ -46,7 +46,7 @@ All P0 items implemented. Summary of key changes:
 
 ### P0 — Engineering / Quality
 
-- [x] **Pre-commit hooks** — clang-tidy, cppcheck (manual), cpplint (manual), shellcheck (auto) added; `.clang-tidy` config created for C++20/Qt6/Google-style.
+- [x] **Pre-commit hooks** — clang-tidy, cppcheck (manual), cpplint (manual), shellcheck (auto) added; `.clang-tidy` config created for C++20/Qt6/Google-style (includes `cppcoreguidelines-use-default-member-init`, `readability-braces-around-statements`, `bugprone-*`, `performance-*`, `modernize-*`, and Qt-compatible exclusions).
   - `.pre-commit-config.yaml`, `.clang-tidy`, `CPPLINT.cfg`
 - [x] **Re-recording bug fix** — `m_ioBuffer.clear()` in `AudioFileStreamSaver::_stop()` zeroed the read buffer, causing subsequent recordings to write 0 bytes. Removed the clear.
   - `src/core/services/StreamAudioStorage.cpp`
@@ -216,6 +216,11 @@ Acceptance:
 
 ## P2 — Polish & Reliability
 
+- [x] **Main-window UI outlook refresh**
+  - Implemented the UI sketch from `assets/UI diagram.heic`: top input panel, central sentence-sequence panel, and bottom control panel.
+  - Applied the reference tactile/neumorphic look from `assets/UIstyle.jpg`: off-white surfaces, rounded panels, pill controls, visible focus states, subtle borders, and panel shadows.
+  - Kept styling isolated from C++ by splitting QSS into `src/app/resources/qss/base/`, `src/app/resources/qss/components/`, and `src/app/resources/qss/screens/`.
+  - `src/app/ui/Q_AppMainWindow.cpp`, `src/app/ui/Q_PlaybackControlBar.cpp`, `src/app/ui/Q_ShadowingBar.cpp`, `src/app/ui/StyleLoader.h`, `src/app/resources/resources.qrc`, `src/app/resources/qss/**`
 - [ ] **Session summary** (FR-038)
   - Aggregate `RecordedSentence::shadowingScore` after a practice run (avg, weakest words via word-diff data once available).
   - Display as a dialog or panel; can live in `Q_AppMainWindow`.
@@ -225,12 +230,18 @@ Acceptance:
 - [ ] **Real-time waveform visualization**
   - Replace the RMS `QProgressBar` in `Q_ShadowingBar` with a small custom widget.
   - Buffer the last ~2 s of audio from `Q_RecordController::updateAmplitude` (or branch off `audioDataAvailable`) and paint with `QPainter`.
+- [ ] **UI screenshot regression checks**
+  - Add a lightweight visual verification path for the main window at desktop and narrow widths.
+  - Confirm text does not overflow the pill buttons, sentence list, or bottom controls after translation/language changes.
+  - Keep QSS changes isolated in resource files; C++ should only provide widget structure, object names, and effects that QSS cannot express.
 - [ ] **Piper TTS synthesis** (FR-013) — `isAvailable()` already done; only the inference path remains
   - Replace the warning-and-empty-return in `src/core/services/PiperTTSEngine.cpp::synthesize` with actual Piper ONNX inference.
   - Decide on dependency strategy (link `libpiper_phonemize` + ONNX Runtime via vcpkg, or shell out to a `piper` binary).
 - [x] **WAV resampling** (closes a stub)
   - Implemented `WAV::resample` in `src/core/entities/WAV.cpp` with linear interpolation.
   - Used by `Q_WhisperWorker::doTranscribeFile` to convert source audio to 16 kHz before Whisper inference.
+- [x] **Clang-tidy braces formatting** — 36 `readability-braces-around-statements` violations fixed across 15 files; 1 `cppcoreguidelines-use-default-member-init` violation fixed (`AudioCache.cpp`). All C++ files now pass both checks.
+  - `src/**/*.cpp`, `src/**/*.h`, `test/**/*.cpp`, `include/**/*.h`
 - [ ] **Config import / export** (NFR-012)
   - "Export settings" / "Import settings" entries in `Q_SettingDialog` that copy `~/.config/Thoth/config.json` to/from a user-chosen path.
 - [ ] **Wire or remove `Q_AppMainWindow::onExportAudio`** (engineering — no PRD ref)

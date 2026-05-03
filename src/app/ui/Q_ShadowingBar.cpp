@@ -8,6 +8,7 @@
 #include <QVBoxLayout>
 
 Q_ShadowingBar::Q_ShadowingBar(QWidget* parent) : QWidget(parent) {
+    setObjectName("shadowingBar");
     setupUI();
     reset();
 }
@@ -36,8 +37,8 @@ void Q_ShadowingBar::reset() {
 
 void Q_ShadowingBar::setupUI() {
     auto outerLayout = new QVBoxLayout(this);
-    outerLayout->setContentsMargins(10, 5, 10, 5);
-    outerLayout->setSpacing(4);
+    outerLayout->setContentsMargins(0, 0, 0, 0);
+    outerLayout->setSpacing(8);
 
     // Top row: record btn, visualizer, play btn
     auto topRow = new QHBoxLayout();
@@ -124,7 +125,9 @@ void Q_ShadowingBar::onRecordingFinished() {
 void Q_ShadowingBar::onASRAnalysisBusy(bool busy) {
     m_btnRecord->setEnabled(!busy);
     m_lblAnalyzing->setVisible(busy);
-    if (busy) m_lblAnalysisResult->setVisible(false);
+    if (busy) {
+        m_lblAnalysisResult->setVisible(false);
+    }
 }
 
 void Q_ShadowingBar::onASRAnalysisReady(double scorePercent) {

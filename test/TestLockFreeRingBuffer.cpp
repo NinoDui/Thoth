@@ -173,7 +173,11 @@ TEST_F(LockFreeRingBufferTest, SPSC_PressureTest) {
         producerFinished.store(true, std::memory_order_release);
     });
 
-    if (producerThread.joinable()) producerThread.join();
-    if (consumerThread.joinable()) consumerThread.join();
+    if (producerThread.joinable()) {
+        producerThread.join();
+    }
+    if (consumerThread.joinable()) {
+        consumerThread.join();
+    }
     SUCCEED();
 }

@@ -73,7 +73,9 @@ void Q_RecordController::setupConnections() {
 }
 
 bool Q_RecordController::startRecording(const std::string& sessionId) {
-    if (m_isRecording) return false;
+    if (m_isRecording) {
+        return false;
+    }
 
     if (!m_captureProducer->start()) {
         LOG_ERROR("Failed to start audio capture");
@@ -87,7 +89,9 @@ bool Q_RecordController::startRecording(const std::string& sessionId) {
 }
 
 void Q_RecordController::stopRecording() {
-    if (!m_isRecording) return;
+    if (!m_isRecording) {
+        return;
+    }
 
     m_captureProducer->stop();
     emit sigStopSession();
@@ -139,7 +143,9 @@ float Q_RecordController::calculateRMS(const QByteArray& buffer) {
     const int16_t* samples = reinterpret_cast<const int16_t*>(buffer.constData());
     uint32_t sampleCnt = buffer.size() / sizeof(int16_t);
 
-    if (sampleCnt <= 0) return 0.0f;
+    if (sampleCnt <= 0) {
+        return 0.0f;
+    }
 
     double sumSquares = 0.0;
     for (size_t i = 0; i < sampleCnt; i += m_rmsStep) {

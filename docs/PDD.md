@@ -1,8 +1,8 @@
 # Project Development Document: Thoth
 
-**Version**: 0.4.0
+**Version**: 0.5.0
 **Last Updated**: 2026-05-03
-**Status**: Active Development (P0+P1 complete — audio import path functional, WAV range playback live)
+**Status**: Active Development (P0+P1 complete — audio import path with WAV + GCP multi-language voice discovery + clang-tidy formatting clean)
 
 ---
 
@@ -112,8 +112,9 @@ Main Thread (GUI)
   │     ├── slot doTranscribeFile(QString)             → source-audio import path
   │     └── WAV::decode → whisper_full → emit transcriptReady / transcriptSegmentsReady
   │
-  └── QtConcurrent thread pool  ◄── short-lived TTS download tasks
+  └── QtConcurrent thread pool  ◄── short-lived TTS download + GCP voice discovery tasks
         └── ITTSEngine::synthesize() → QFutureWatcher::finished (main thread)
+        └── GCPTextToSpeechClient::listVoices() → QFutureWatcher::finished (main thread)
 ```
 
 **Synchronization**:
@@ -144,6 +145,7 @@ Main Thread (GUI)
 | `Q_AudioPlayer.h` | `Q_AudioPlayer` | Pure-functional `QMediaPlayer` + `QAudioOutput` wrapper |
 | `WERScorer.h` | `WERScorer : ISentenceScorer` | WER-based scoring with Levenshtein DP back-trace for per-token alignment |
 | `TTSEngineFactory.h` | `thoth::CreateTTSEngine()` | Factory; selects Piper if requested + available, otherwise GCP |
+| `Q_GCPVoiceLoader.h` | `Q_GCPVoiceLoader` | Async voice discovery via `QtConcurrent::run` → `GCPTextToSpeechClient::listVoices()`; emits `voicesReady` or `loadError` |
 | `AuthProviderFactory.h` | `AuthChain`, `AuthCallbacks`, `AuthProviderFactory` | Chain-of-responsibility GCP auth |
 
 ### 4.2 Core Library (`src/core/`)
@@ -170,13 +172,13 @@ Main Thread (GUI)
 
 | Service | Purpose |
 |---------|---------|
-| `GCP.cpp` (`GCPTextToSpeechClient`) | Wraps `google::cloud::texttospeech_v1::TextToSpeechClient`. Maps the configured `audioEncoding` string to the GCP enum (MP3 / OGG_OPUS / LINEAR16 / MULAW; defaults to MP3). Throws `std::runtime_error` wrapping `google::cloud::Status` on failure. |
+| `GCP.cpp` (`GCPTextToSpeechClient`) | Wraps `google::cloud::texttospeech_v1::TextToSpeechClient`. `synthesize()` maps the configured `audioEncoding` string to the GCP enum (MP3 / OGG_OPUS / LINEAR16 / MULAW; defaults to MP3). `listVoices(languageCode)` queries Google for available TTS voices, returning a `std::vector<GoogleVoiceInfo>` with name, language codes, and gender per voice. Throws `std::runtime_error` wrapping `google::cloud::Status` on failure. |
 | `GCPTTSEngine.cpp` | `thoth::ITTSEngine` adapter over `GCPTextToSpeechClient`. `isAvailable()` returns `true` unconditionally; failures surface at `synthesize()` time. |
 | `PiperTTSEngine.cpp` | Local Piper adapter. `isAvailable()` returns `true` if the model file exists, but `synthesize()` is a logged warning that returns an empty result — full Piper integration is deferred. |
 | `TTSEngineFactory.cpp` | `CreateTTSEngine(engineName, gcpConfigPath, piperModelPath)`. If `engineName == "piper"` and the engine reports available, returns Piper; otherwise constructs `GCPTTSEngine` from `ConfigStore::getGoogleTTSConfig()`. The `gcpConfigPath` parameter is currently unused (call site passes `""`). |
 | `Q_GCPTTSDownloader.cpp` (class `Q_TTSDownloader`) | Wraps any `ITTSEngine` for async dispatch via `QtConcurrent::run` + `QFutureWatcher`. Callback receives `(success, QByteArray, errorMsg)` on the main thread. |
 | `TextContentProvider.cpp` | Implements `IContentProvider`: parses `.txt` via `TextParser`, parses pasted text via `TextParser::parseText()`, builds `Session` with `Sentence` entries, then `prepareAudio()` checks `AudioCache`, deduplicates via `m_downloadingIdx`, and dispatches via `Q_TTSDownloader`. On success, writes file to cache (MD5-named) and stores path in `Sentence::localAudioPath`. |
-| `AudioCache.cpp` | Per-sentence audio cache. Filename derived from **MD5** hex of the sentence text + `.mp3` extension. `get(sentence)` returns the cached path if the file exists and is non-empty. `saveAudio(idx, sentence, data)` writes via `QFile` and tracks `idx → path` map. |
+| `AudioCache.cpp` | Per-sentence audio cache. Filename derived from **MD5** hex of `(sentence text | engine cacheIdentity string)` + `.mp3` extension. `get(sentence, cacheIdentity)` returns the cached path if the file exists and is non-empty. `saveAudio(idx, sentence, cacheIdentity, data)` writes via `QFile` and tracks `idx → path` map. The `cacheIdentity` is engine-specific (`ITTSEngine::cacheIdentity()`), keeping the cache engine-agnostic. |
 | `AudioCapture.cpp` (`Q_AudioCaptureProducer`) | Wraps `QAudioSource` over the default input device. Negotiates format with the device; falls back to `defaultDevice.preferredFormat()` if the requested 16 kHz / mono / Int16 is not supported. Logs the negotiated format. Emits `audioDataAvailable(QByteArray)` on every `readyRead`. |
 | `StreamAudioStorage.cpp` (`AudioFileStreamSaver`) | Drains `LockFreeRingBuffer` into a `QFile` every 30 ms. Writes a 44-byte placeholder header on `startSession`, accumulates `m_totalBytes`, and back-writes the real `WAVHeader` on `finalizeSession`. Default root is `<cacheDir>/record/`; session file is `<sessionId>.wav`. |
 | `Q_AudioPlayer.cpp` | Thin `QMediaPlayer` + `QAudioOutput` wrapper. `play(path)` for full playback; `play(path, startMs, endMs)` for range playback (seeks on `LoadedMedia`, auto-stops via `QTimer` at `endMs`, emits `finished()`). Exposes `setRate(qreal)` / `rate()` for playback speed control. |
@@ -223,11 +225,29 @@ Main Thread (GUI)
 |------|---------|
 | `main.cpp` | Constructs `AppRunner` and calls `run()` — that's the entire entry point. |
 | `AppRunner.{h,cpp}` | Bootstrap order: `ConfigStore::init()` → `LogManager::Guard` → `QApplication` → `StyleLoader::attach()` → `setupNetwork()` (proxy env vars) → `authenticate()` (chain prompts for GCP credential) → `Q_AppMainWindow::show()` → `app->exec()`. Top-level try/catch around `run()` translates uncaught exceptions to `QMessageBox::critical`. |
-| `ui/Q_AppMainWindow.{h,cpp}` | Main window: menu bar (`Import File` accepts `*.txt *.wav *.mp3 *.m4a *.flac`), text-box input (`QPlainTextEdit` + "Load Text"), `QListWidget` (word-level colored diff via `HtmlDelegate`), `Q_PlaybackControlBar`, `Q_ShadowingBar`. `onImportFile` dispatches `.txt` → `TextContentProvider`, audio files → `AudioContentProvider`. Constructs both content providers and all controllers in `setupControllers()`. |
-| `ui/Q_SettingDialog.{h,cpp}` | Tabbed dialog (`General` / `Network` / `About`). General tab: cache dir, log dir, TTS engine combo (`gcp` / `piper`), GCP credential file picker, language combo (`en-US`, `sv-SE`, `zh-CN`, `ja-JP`, `ko-KR`) with auto-mapped default voice, voice combo (editable), Piper model path, Whisper model path + language combo. Network tab: proxy string. Save writes through `ConfigStore::setValue` and pushes proxy env vars immediately. |
+| `ui/Q_AppMainWindow.{h,cpp}` | Main window: neumorphic three-panel workspace matching the current UI sketch: top `INPUT` panel with `LOAD FILE` / `TEXT TYPE` / `SETTINGS`, central `sentence sequence` panel with `QListWidget` + word-level colored diff via `HtmlDelegate`, and bottom control panel combining `Q_ShadowingBar` + `Q_PlaybackControlBar`. `onImportFile` dispatches `.txt` → `TextContentProvider`, audio files → `AudioContentProvider`. Constructs both content providers and all controllers in `setupControllers()`. |
+| `ui/Q_SettingDialog.{h,cpp}` | Tabbed dialog (`General` / `Network` / `About`). General tab: cache/log dirs, TTS engine combo (toggles GCP vs Piper rows), GCP credential, 4-language voice combo with async Google voice discovery (`Q_GCPVoiceLoader`), audio encoding selector (MP3/OGG_OPUS/WAV/MULAW), Piper model path, Whisper model path + language combo. Network tab: proxy. Save persists all settings and pushes proxy env vars. |
 | `ui/Q_ShadowingBar.{h,cpp}` | Record/Stop toggle button, "Play user audio" button, RMS visualizer (`QProgressBar`), analyzing/result labels. Emits `sigStartRecording / sigStopRecording / sigPlayUserAudio`. Slots for `setAmplitude`, `onRecordingFinished`, `onASRAnalysisBusy`, `onASRAnalysisReady(scorePercent)`. `triggerRecording()` public method for programmatic recording start (used by pause-and-repeat mode). |
 | `ui/Q_PlaybackControlBar.{h,cpp}` | Prev / Play-Pause / Next buttons, single-sentence loop checkbox, inter-loop delay spinbox, speed slider (0.5x–2.0x), shadowing mode combo (`Normal` / `Pause-and-Repeat` / `Simultaneous`). |
-| `ui/StyleLoader.h` | Stylesheet loader. |
+| `ui/StyleLoader.h` | Aggregated stylesheet loader. Loads isolated QSS resources from `qss/base/`, `qss/components/`, and `qss/screens/` rather than embedding CSS in C++ code. |
+
+#### 4.3.1 UI Outlook and Styling
+
+The current desktop outlook follows `assets/UI diagram.heic` for structure and `assets/UIstyle.jpg` for visual language.
+
+Layout:
+- **Top input panel** — first-viewport input area with title `INPUT`, file import, text-entry submit, settings access, and the text paste box.
+- **Main sequence panel** — dominant sentence-sequence list for imported/generated practice content; this remains the primary work surface.
+- **Bottom control panel** — combines recording controls, RMS feedback, user-recording playback, sentence navigation, loop/delay, speed, and shadowing mode controls.
+
+Style:
+- Light tactile/neumorphic surface with off-white background, subtle borders, rounded panels, pill buttons, compact status badges, and visible focus rings.
+- Real panel shadow is implemented with `QGraphicsDropShadowEffect` because Qt QSS does not provide true drop shadows.
+- QSS is intentionally isolated from C++:
+  - `src/app/resources/qss/base/tokens.qss` — app-wide typography, base colors, menu styling.
+  - `src/app/resources/qss/components/controls.qss` — shared buttons, inputs, combo boxes, spin boxes, scroll bars.
+  - `src/app/resources/qss/components/playback.qss` — playback, record button, visualizer, sliders.
+  - `src/app/resources/qss/screens/main_window.qss` — main-window panels, sentence list, status badge.
 
 ### 4.4 Data Flow: Text-Input Shadowing
 
@@ -449,11 +469,11 @@ cmake --build build/debug --target RunThothTest
 
 | Feature | Priority |
 |---------|----------|
-| Audio file import → STT → segmentation → time-aligned playback | High (FR-003, FR-021) |
+| Non-WAV audio decode (MP3/M4A/FLAC via QAudioDecoder) | Medium (FR-003) |
 | Session persistence / recovery | Medium (NFR-009) |
 | Session summary view | Medium (FR-038) |
 | Piper synthesis implementation | Medium |
-| WAV resampling (`WAV::resample` is a stub) | Medium |
+| Language detection (FR-007) | Medium |
 | Real-time waveform visualization (current is RMS bar only) | Low |
 | Exportable practice reports | Low |
 | Spaced repetition for weak sentences | Low |
@@ -527,7 +547,7 @@ cmake --build build/debug --target RunThothTest
 ### 11.3 Style Enforcement
 
 - `.clang-format` (Google-based, 100 col, 4-space indent)
-- `.clang-tidy` (C++20/Qt6-tuned, bugprone/performance/readability/modernize/cppcoreguidelines checks)
+- `.clang-tidy` (C++20/Qt6-tuned, bugprone/performance/readability/modernize/cppcoreguidelines checks — includes `cppcoreguidelines-use-default-member-init`, `readability-braces-around-statements`, and 40+ other checks)
 - `.cmake-format.yaml`
 - `.pre-commit-config.yaml` runs clang-format + cmake-format + shellcheck on every commit; clang-tidy + cppcheck + cpplint available as manual-stage hooks
 - `CPPLINT.cfg` for Google-style cpplint (manual use)
@@ -566,7 +586,7 @@ cmake --build build/debug --target RunThothTest
 Thoth/
 ├── cmake/
 │   └── ThothVcpkgToolchain.cmake         # Triplet selection wrapper
-├── include/thoth/                        # Public API (16 headers)
+├── include/thoth/                        # Public API (17 headers)
 │   ├── AudioContentProvider.h
 │   ├── Entity.h
 │   ├── ITTSEngine.h
@@ -582,11 +602,18 @@ Thoth/
 │   ├── Q_AudioPlayer.h
 │   ├── WERScorer.h
 │   ├── TTSEngineFactory.h
+│   ├── Q_GCPVoiceLoader.h
 │   └── AuthProviderFactory.h
 ├── src/
 │   ├── app/
 │   │   ├── main.cpp
 │   │   ├── AppRunner.{h,cpp}
+│   │   ├── resources/
+│   │   │   ├── resources.qrc
+│   │   │   └── qss/
+│   │   │       ├── base/        # App-wide tokens and root widget styling
+│   │   │       ├── components/  # Shared control/playback styles
+│   │   │       └── screens/     # Main-window screen-level styles
 │   │   └── ui/
 │   │       ├── Q_AppMainWindow.{h,cpp}
 │   │       ├── Q_SettingDialog.{h,cpp}
@@ -680,13 +707,15 @@ Thoth/
 - [x] Playback speed control (0.5x–2.0x slider)
 - [x] Settings dialog: Whisper language combo + playback speed + mode persistence
 
-### Phase 2 — Audio Import (current, mostly complete)
+### Phase 2 — Audio Import ✅ Mostly complete (WAV done; non-WAV + language detection pending)
 
 - [x] Audio file import — `.wav` via `WAV::decode` + `AudioContentProvider`
 - [x] Source-audio Whisper transcription with timestamp extraction
 - [x] Audio-text alignment (Whisper segments → `Sentence::audioRange`)
 - [x] Range playback (`Q_AudioPlayer::play(path, startMs, endMs)`)
 - [x] WAV resampling (linear interpolation in `WAV::resample`)
+- [x] GCP TTS multi-language: async voice discovery (`Q_GCPVoiceLoader`), 4-language combo, voice auto-mapping, encoding selector, engine-aware UI toggle
+- [x] Audio cache refactored to engine-agnostic `cacheIdentity` (no longer hard-wired to GoogleTTSConfig)
 - [ ] Non-WAV decode (MP3/M4A/FLAC via `QAudioDecoder`)
 - [ ] Language detection (FR-007)
 

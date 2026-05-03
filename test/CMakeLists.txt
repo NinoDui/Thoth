@@ -6,6 +6,7 @@ add_executable(
     WAVTest.cpp
     WERScorerTest.cpp
     TextParserTest.cpp
+    TextContentProviderTest.cpp
     TestRecordController.cpp
     TestLockFreeRingBuffer.cpp
     test_main.cpp

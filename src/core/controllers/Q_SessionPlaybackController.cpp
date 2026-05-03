@@ -175,7 +175,9 @@ int Q_SessionPlaybackController::currentIndex() const { return m_currentIdx; }
 bool Q_SessionPlaybackController::isActive() const { return m_active; }
 
 void Q_SessionPlaybackController::_onPlayerFinished() {
-    if (!m_autoAdvance) return;
+    if (!m_autoAdvance) {
+        return;
+    }
     emit sentencePlayFinished(m_currentIdx);
 
     if (m_mode == "pause-and-repeat") {

@@ -1,5 +1,9 @@
 <RCC>
     <qresource prefix="/">
         <file>qss/style.qss</file>
+        <file>qss/base/tokens.qss</file>
+        <file>qss/components/controls.qss</file>
+        <file>qss/components/playback.qss</file>
+        <file>qss/screens/main_window.qss</file>
     </qresource>
 </RCC>

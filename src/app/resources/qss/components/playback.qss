@@ -1,0 +1,97 @@
+QWidget#playbackBar,
+QWidget#shadowingBar {
+    background: transparent;
+}
+
+QPushButton#roundControlButton {
+    min-width: 0px;
+    min-height: 0px;
+    padding: 0px;
+    border-radius: 22px;
+    background: #eeede8;
+    border: 1px solid #d0cec7;
+}
+
+QPushButton#roundControlButton:hover {
+    background: #f7f6f2;
+}
+
+QPushButton#roundControlButton:pressed {
+    background: #d9d7d0;
+}
+
+QPushButton#btnRecord {
+    background-color: transparent;
+    border: 2px solid #ff3b30;
+    border-radius: 20px;
+    qproperty-iconSize: 0px;
+    background-image: none;
+}
+
+QPushButton#btnRecord[recording="false"]:hover {
+    background-color: #f8dfdc;
+}
+
+QPushButton#btnRecord[recording="true"] {
+    background-color: #ff3b30;
+    border: 2px solid #ff3b30;
+    border-radius: 6px;
+}
+
+QProgressBar#visualizer {
+    border: none;
+    background-color: #d8d6cf;
+    border-radius: 3px;
+}
+
+QProgressBar#visualizer::chunk {
+    background-color: #3c91e6;
+    border-radius: 3px;
+}
+
+QPushButton#btnPlayUserAudio {
+    background-color: #efeee9;
+    border: 1px solid #d3d1ca;
+    color: #202124;
+    border-radius: 16px;
+    padding: 5px 14px;
+}
+
+QPushButton#btnPlayUserAudio:disabled {
+    border-color: #d8d6cf;
+    color: #9d9a92;
+    background: #e7e5df;
+}
+
+QLabel#controlLabel,
+QLabel#rateBadge,
+QCheckBox#loopToggle {
+    color: #4c4b47;
+}
+
+QLabel#rateBadge {
+    background: #efeee9;
+    border: 1px solid #d3d1ca;
+    border-radius: 12px;
+    padding: 4px 7px;
+}
+
+QSlider#rateSlider::groove:horizontal {
+    height: 7px;
+    border-radius: 3px;
+    background: #d8d6cf;
+}
+
+QSlider#rateSlider::sub-page:horizontal {
+    border-radius: 3px;
+    background: #3c91e6;
+}
+
+QSlider#rateSlider::handle:horizontal {
+    width: 20px;
+    height: 20px;
+    margin: -7px 0px;
+    border-radius: 10px;
+    background: #f7f6f2;
+    border: 1px solid #c5c3bc;
+}

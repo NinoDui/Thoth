@@ -7,7 +7,7 @@
 
 namespace fs = std::filesystem;
 
-AudioCache::AudioCache() : m_cacheDir(ConfigStore::instance().getCacheDir()), m_override(false) {
+AudioCache::AudioCache() : m_cacheDir(ConfigStore::instance().getCacheDir()) {
     if (!fs::exists(m_cacheDir) || (m_override && fs::exists(m_cacheDir))) {
         fs::create_directories(m_cacheDir);
     }
@@ -30,12 +30,16 @@ std::string AudioCache::_hash(const std::string& input) {
 
 std::optional<fs::path> AudioCache::get(const std::string& sentence) const {
     fs::path dst = getFileName(sentence);
-    if (fs::exists(dst) && fs::file_size(dst) > 0) return dst;
+    if (fs::exists(dst) && fs::file_size(dst) > 0) {
+        return dst;
+    }
     return std::nullopt;
 }
 
 std::optional<fs::path> AudioCache::get(int idx) const {
-    if (m_idxToPath.contains(idx)) return m_idxToPath.at(idx);
+    if (m_idxToPath.contains(idx)) {
+        return m_idxToPath.at(idx);
+    }
     return std::nullopt;
 }
 
@@ -52,7 +56,9 @@ fs::path AudioCache::getFileName(const std::string& sentence,
 std::optional<fs::path> AudioCache::get(const std::string& sentence,
                                         const std::string& cacheIdentity) const {
     fs::path dst = getFileName(sentence, cacheIdentity);
-    if (fs::exists(dst) && fs::file_size(dst) > 0) return dst;
+    if (fs::exists(dst) && fs::file_size(dst) > 0) {
+        return dst;
+    }
     return std::nullopt;
 }
 
