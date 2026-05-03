@@ -54,6 +54,7 @@ void Q_SettingDialog::setupUI() {
 
     auto* pathGroup = new QGroupBox("Path Settings", generalTab);
     auto* pathLayout = new QFormLayout(pathGroup);
+    pathLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
     auto createBrowseRow = [this](const QString& label, QLineEdit*& lineEdit, bool isDir) {
         lineEdit = new QLineEdit();
@@ -77,45 +78,54 @@ void Q_SettingDialog::setupUI() {
 
     auto* ttsGroup = new QGroupBox("Text-to-Speech", generalTab);
     auto* ttsLayout = new QFormLayout(ttsGroup);
+    ttsLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
     m_comboTTSEngine = new QComboBox();
+    m_comboTTSEngine->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_comboTTSEngine->addItems({"gcp", "piper"});
     m_comboLanguage = new QComboBox();
+    m_comboLanguage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     for (const auto& entry : kTtsLanguages) {
         m_comboLanguage->addItem(entry);
     }
     m_comboVoice = new QComboBox();
-    m_comboVoice->setEditable(true);
+    m_comboVoice->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_comboEncoding = new QComboBox();
+    m_comboEncoding->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_comboEncoding->addItems({"MP3", "OGG_OPUS", "WAV", "MULAW"});
     m_editPiperModelPath = new QLineEdit();
 
     ttsLayout->addRow("Engine:", m_comboTTSEngine);
 
     m_gcpCredRow = new QWidget();
+    m_gcpCredRow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     auto* gcpCredLayout = new QHBoxLayout(m_gcpCredRow);
     gcpCredLayout->setContentsMargins(0, 0, 0, 0);
     gcpCredLayout->addLayout(createBrowseRow("GCPCred", m_editGoogleCredentialPath, false));
     ttsLayout->addRow("Credential:", m_gcpCredRow);
 
     m_gcpLangRow = new QWidget();
+    m_gcpLangRow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     auto* gcpLangLayout = new QHBoxLayout(m_gcpLangRow);
     gcpLangLayout->setContentsMargins(0, 0, 0, 0);
     gcpLangLayout->addWidget(m_comboLanguage);
     ttsLayout->addRow("Language:", m_gcpLangRow);
 
     m_gcpVoiceRow = new QWidget();
+    m_gcpVoiceRow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     auto* gcpVoiceLayout = new QHBoxLayout(m_gcpVoiceRow);
     gcpVoiceLayout->setContentsMargins(0, 0, 0, 0);
     gcpVoiceLayout->addWidget(m_comboVoice);
     ttsLayout->addRow("Voice Name:", m_gcpVoiceRow);
 
     m_gcpEncRow = new QWidget();
+    m_gcpEncRow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     auto* gcpEncLayout = new QHBoxLayout(m_gcpEncRow);
     gcpEncLayout->setContentsMargins(0, 0, 0, 0);
     gcpEncLayout->addWidget(m_comboEncoding);
     ttsLayout->addRow("Encoding:", m_gcpEncRow);
 
     m_piperRow = new QWidget();
+    m_piperRow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     auto* piperLayout = new QHBoxLayout(m_piperRow);
     piperLayout->setContentsMargins(0, 0, 0, 0);
     piperLayout->addLayout(createBrowseRow("PiperModel", m_editPiperModelPath, false));
@@ -124,21 +134,30 @@ void Q_SettingDialog::setupUI() {
     connect(m_comboTTSEngine, &QComboBox::currentTextChanged,
             [this](const QString&) { updateTTSEngineVisibility(); });
     connect(m_comboLanguage, &QComboBox::currentTextChanged, [this](const QString& display) {
+        // Immediately clear voice combo to prevent stale voice from previous language
+        // being accidentally saved before the async fetch completes.
+        m_comboVoice->clear();
+        m_comboVoice->addItem("Loading voices...");
+        m_comboVoice->setEnabled(false);
+
         std::string langCode = languageCodeFromDisplay(display);
         loadVoicesForLanguage(langCode);
     });
 
     auto* asrGroup = new QGroupBox("Speech Recognition", generalTab);
     auto* asrLayout = new QFormLayout(asrGroup);
+    asrLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
     m_editWhisperModelPath = new QLineEdit();
     asrLayout->addRow("Whisper Model:",
                       createBrowseRow("WhisperModel", m_editWhisperModelPath, false));
     m_comboWhisperLanguage = new QComboBox();
+    m_comboWhisperLanguage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_comboWhisperLanguage->addItems({"en", "sv", "zh", "ja", "ko"});
     asrLayout->addRow("Language:", m_comboWhisperLanguage);
 
     auto* configFileGroup = new QGroupBox("Configuration File", generalTab);
     auto* configFileLayout = new QFormLayout(configFileGroup);
+    configFileLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
     auto* lblConfigPath =
         new QLabel(QString::fromStdString(ConfigStore::instance().getConfigFilePath().string()));
     lblConfigPath->setWordWrap(true);
@@ -154,6 +173,7 @@ void Q_SettingDialog::setupUI() {
     // --- Tab 2: Network ---
     QWidget* networkTab = new QWidget();
     auto* networkLayout = new QFormLayout(networkTab);
+    networkLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
     m_editProxy = new QLineEdit();
     m_editProxy->setPlaceholderText("http://127.0.0.1:7890");
     networkLayout->addRow("HTTP/gRPC Proxy:", m_editProxy);
@@ -201,13 +221,17 @@ void Q_SettingDialog::loadSettings() {
 
     std::string savedLang =
         getStr(thoth::config::KEY_TTS_LANG, thoth::config::DEFAULT_TTS_LANG).toStdString();
+    // Block signals during initial language selection to avoid prematurely
+    // clearing the voice combo before loadVoicesForLanguage populates it.
+    m_comboLanguage->blockSignals(true);
     int langIdx = m_comboLanguage->findText(QString::fromStdString(savedLang), Qt::MatchContains);
     if (langIdx >= 0) {
         m_comboLanguage->setCurrentIndex(langIdx);
     }
+    m_comboLanguage->blockSignals(false);
 
-    m_comboVoice->setCurrentText(
-        getStr(thoth::config::KEY_TTS_VOICE, thoth::config::DEFAULT_TTS_VOICE));
+    std::string savedVoice =
+        getStr(thoth::config::KEY_TTS_VOICE, thoth::config::DEFAULT_TTS_VOICE).toStdString();
     m_comboEncoding->setCurrentText(
         getStr(thoth::config::KEY_TTS_AUDIO_ENCODING, thoth::config::DEFAULT_TTS_AUDIO_ENCODING));
     m_comboTTSEngine->setCurrentText(
@@ -223,36 +247,46 @@ void Q_SettingDialog::loadSettings() {
     updateTTSEngineVisibility();
 
     std::string initialLang = languageCodeFromDisplay(m_comboLanguage->currentText());
+    m_comboVoice->clear();
+    m_comboVoice->addItem("Loading voices...");
+    m_comboVoice->setEnabled(false);
+    m_isInitialLoad = true;
+    m_initialVoice = savedVoice;
     loadVoicesForLanguage(initialLang);
 }
 
 void Q_SettingDialog::saveSettings() {
     auto& store = ConfigStore::instance();
-    bool needsRestart = false;
 
-    auto oldCache = store.getValue<std::string>(thoth::config::KEY_CACHE_DIR);
-    auto oldLog = store.getValue<std::string>(thoth::config::KEY_LOG_DIR);
-    auto oldSampleRate = store.getValue<uint32_t>(thoth::config::KEY_AUDIO_RECORDER_SAMPLE_RATE);
+    store.setValueSilent(thoth::config::KEY_CACHE_DIR, m_editCacheDir->text().toStdString());
+    store.setValueSilent(thoth::config::KEY_LOG_DIR, m_editLogDir->text().toStdString());
+    store.setValueSilent(thoth::config::KEY_GOOGLE_CREDENTIAL_PATH,
+                         m_editGoogleCredentialPath->text().toStdString());
 
-    store.setValue(thoth::config::KEY_CACHE_DIR, m_editCacheDir->text().toStdString());
-    store.setValue(thoth::config::KEY_LOG_DIR, m_editLogDir->text().toStdString());
-    store.setValue(thoth::config::KEY_GOOGLE_CREDENTIAL_PATH,
-                   m_editGoogleCredentialPath->text().toStdString());
+    store.setValueSilent(thoth::config::KEY_TTS_LANG,
+                         languageCodeFromDisplay(m_comboLanguage->currentText()));
 
-    store.setValue(thoth::config::KEY_TTS_LANG,
-                   languageCodeFromDisplay(m_comboLanguage->currentText()));
-    store.setValue(thoth::config::KEY_TTS_VOICE, m_comboVoice->currentText().toStdString());
-    store.setValue(thoth::config::KEY_TTS_AUDIO_ENCODING,
-                   m_comboEncoding->currentText().toStdString());
-    store.setValue(thoth::config::KEY_TTS_ENGINE, m_comboTTSEngine->currentText().toStdString());
-    store.setValue(thoth::config::KEY_TTS_PIPER_MODEL_PATH,
-                   m_editPiperModelPath->text().toStdString());
-    store.setValue(thoth::config::KEY_WHISPER_MODEL_PATH,
-                   m_editWhisperModelPath->text().toStdString());
-    store.setValue(thoth::config::KEY_WHISPER_MODEL_LANGUAGE,
-                   m_comboWhisperLanguage->currentText().toStdString());
+    std::string voiceToSave;
+    if (m_comboVoice->isEnabled() && m_comboVoice->count() > 0 &&
+        m_comboVoice->currentText() != "Loading voices...") {
+        voiceToSave = m_comboVoice->currentText().toStdString();
+    } else {
+        voiceToSave = thoth::config::DefaultVoiceForLanguage(
+            languageCodeFromDisplay(m_comboLanguage->currentText()));
+    }
+    store.setValueSilent(thoth::config::KEY_TTS_VOICE, voiceToSave);
+    store.setValueSilent(thoth::config::KEY_TTS_AUDIO_ENCODING,
+                         m_comboEncoding->currentText().toStdString());
+    store.setValueSilent(thoth::config::KEY_TTS_ENGINE,
+                         m_comboTTSEngine->currentText().toStdString());
+    store.setValueSilent(thoth::config::KEY_TTS_PIPER_MODEL_PATH,
+                         m_editPiperModelPath->text().toStdString());
+    store.setValueSilent(thoth::config::KEY_WHISPER_MODEL_PATH,
+                         m_editWhisperModelPath->text().toStdString());
+    store.setValueSilent(thoth::config::KEY_WHISPER_MODEL_LANGUAGE,
+                         m_comboWhisperLanguage->currentText().toStdString());
 
-    store.setValue(thoth::config::KEY_PROXY, m_editProxy->text().toStdString());
+    store.setValueSilent(thoth::config::KEY_PROXY, m_editProxy->text().toStdString());
 
     if (!m_editProxy->text().isEmpty()) {
         QByteArray proxyBytes = m_editProxy->text().toLocal8Bit();
@@ -261,7 +295,8 @@ void Q_SettingDialog::saveSettings() {
         qputenv("grpc_proxy", proxyBytes);
     }
 
-    LOG_DEBUG("Settings updated, current settings: {}", store);
+    store.endBatchUpdate();
+    LOG_DEBUG("Settings saved and applied, current settings: {}", store);
 }
 
 void Q_SettingDialog::updateTTSEngineVisibility() {
@@ -289,18 +324,32 @@ void Q_SettingDialog::loadVoicesForLanguage(const std::string& languageCode) {
 
                 m_loadedVoices = voices;
                 m_loadedLanguage = langCode;
-                QString savedVoice = m_comboVoice->currentText();
+
                 m_comboVoice->clear();
-                bool savedFound = false;
+                m_comboVoice->setEnabled(true);
+
+                // During initial load, try to restore the user's saved voice.
+                // When the user manually changes language, select the default voice for that
+                // language.
+                QString targetVoice;
+                if (m_isInitialLoad) {
+                    targetVoice = QString::fromStdString(m_initialVoice);
+                    m_isInitialLoad = false;
+                } else {
+                    targetVoice =
+                        QString::fromStdString(thoth::config::DefaultVoiceForLanguage(langCode));
+                }
+
+                bool targetFound = false;
                 for (const auto& v : voices) {
                     QString name = QString::fromStdString(v.name);
                     m_comboVoice->addItem(name);
-                    if (name == savedVoice) {
-                        savedFound = true;
+                    if (name == targetVoice) {
+                        targetFound = true;
                     }
                 }
-                if (savedFound) {
-                    m_comboVoice->setCurrentText(savedVoice);
+                if (targetFound) {
+                    m_comboVoice->setCurrentText(targetVoice);
                 } else {
                     m_comboVoice->setCurrentIndex(0);
                 }
@@ -312,6 +361,10 @@ void Q_SettingDialog::loadVoicesForLanguage(const std::string& languageCode) {
                     }
                     LOG_WARN("Voice loading failed for language '{}': {}", langCode,
                              errorMsg.toStdString());
+                    m_comboVoice->clear();
+                    m_comboVoice->addItem(
+                        QString::fromStdString(thoth::config::DefaultVoiceForLanguage(langCode)));
+                    m_comboVoice->setEnabled(true);
                 });
     }
 

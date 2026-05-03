@@ -1,8 +1,8 @@
 # Project Development Document: Thoth
 
-**Version**: 0.5.0
+**Version**: 0.6.1
 **Last Updated**: 2026-05-03
-**Status**: Active Development (P0+P1 complete — audio import path with WAV + GCP multi-language voice discovery + clang-tidy formatting clean)
+**Status**: Active Development (P0+P1 complete — config batching, voice UX fixes, macOS bundle, UI polish, encoding-aware audio cache)
 
 ---
 
@@ -178,7 +178,7 @@ Main Thread (GUI)
 | `TTSEngineFactory.cpp` | `CreateTTSEngine(engineName, gcpConfigPath, piperModelPath)`. If `engineName == "piper"` and the engine reports available, returns Piper; otherwise constructs `GCPTTSEngine` from `ConfigStore::getGoogleTTSConfig()`. The `gcpConfigPath` parameter is currently unused (call site passes `""`). |
 | `Q_GCPTTSDownloader.cpp` (class `Q_TTSDownloader`) | Wraps any `ITTSEngine` for async dispatch via `QtConcurrent::run` + `QFutureWatcher`. Callback receives `(success, QByteArray, errorMsg)` on the main thread. |
 | `TextContentProvider.cpp` | Implements `IContentProvider`: parses `.txt` via `TextParser`, parses pasted text via `TextParser::parseText()`, builds `Session` with `Sentence` entries, then `prepareAudio()` checks `AudioCache`, deduplicates via `m_downloadingIdx`, and dispatches via `Q_TTSDownloader`. On success, writes file to cache (MD5-named) and stores path in `Sentence::localAudioPath`. |
-| `AudioCache.cpp` | Per-sentence audio cache. Filename derived from **MD5** hex of `(sentence text | engine cacheIdentity string)` + `.mp3` extension. `get(sentence, cacheIdentity)` returns the cached path if the file exists and is non-empty. `saveAudio(idx, sentence, cacheIdentity, data)` writes via `QFile` and tracks `idx → path` map. The `cacheIdentity` is engine-specific (`ITTSEngine::cacheIdentity()`), keeping the cache engine-agnostic. |
+| `AudioCache.cpp` | Per-sentence audio cache. Filename derived from **MD5** hex of `(sentence text | engine cacheIdentity string)` + an encoding-aware extension (`.mp3` / `.ogg` / `.wav`). Extension is extracted from the engine's `cacheIdentity` (which includes the configured `audio_encoding`), so different encodings produce correctly-named cache files. `get(sentence, cacheIdentity)` returns the cached path if the file exists and is non-empty. `saveAudio(idx, sentence, cacheIdentity, data)` writes via `QFile` and tracks `idx → path` map. |
 | `AudioCapture.cpp` (`Q_AudioCaptureProducer`) | Wraps `QAudioSource` over the default input device. Negotiates format with the device; falls back to `defaultDevice.preferredFormat()` if the requested 16 kHz / mono / Int16 is not supported. Logs the negotiated format. Emits `audioDataAvailable(QByteArray)` on every `readyRead`. |
 | `StreamAudioStorage.cpp` (`AudioFileStreamSaver`) | Drains `LockFreeRingBuffer` into a `QFile` every 30 ms. Writes a 44-byte placeholder header on `startSession`, accumulates `m_totalBytes`, and back-writes the real `WAVHeader` on `finalizeSession`. Default root is `<cacheDir>/record/`; session file is `<sessionId>.wav`. |
 | `Q_AudioPlayer.cpp` | Thin `QMediaPlayer` + `QAudioOutput` wrapper. `play(path)` for full playback; `play(path, startMs, endMs)` for range playback (seeks on `LoadedMedia`, auto-stops via `QTimer` at `endMs`, emits `finished()`). Exposes `setRate(qreal)` / `rate()` for playback speed control. |
@@ -225,8 +225,8 @@ Main Thread (GUI)
 |------|---------|
 | `main.cpp` | Constructs `AppRunner` and calls `run()` — that's the entire entry point. |
 | `AppRunner.{h,cpp}` | Bootstrap order: `ConfigStore::init()` → `LogManager::Guard` → `QApplication` → `StyleLoader::attach()` → `setupNetwork()` (proxy env vars) → `authenticate()` (chain prompts for GCP credential) → `Q_AppMainWindow::show()` → `app->exec()`. Top-level try/catch around `run()` translates uncaught exceptions to `QMessageBox::critical`. |
-| `ui/Q_AppMainWindow.{h,cpp}` | Main window: neumorphic three-panel workspace matching the current UI sketch: top `INPUT` panel with `LOAD FILE` / `TEXT TYPE` / `SETTINGS`, central `sentence sequence` panel with `QListWidget` + word-level colored diff via `HtmlDelegate`, and bottom control panel combining `Q_ShadowingBar` + `Q_PlaybackControlBar`. `onImportFile` dispatches `.txt` → `TextContentProvider`, audio files → `AudioContentProvider`. Constructs both content providers and all controllers in `setupControllers()`. |
-| `ui/Q_SettingDialog.{h,cpp}` | Tabbed dialog (`General` / `Network` / `About`). General tab: cache/log dirs, TTS engine combo (toggles GCP vs Piper rows), GCP credential, 4-language voice combo with async Google voice discovery (`Q_GCPVoiceLoader`), audio encoding selector (MP3/OGG_OPUS/WAV/MULAW), Piper model path, Whisper model path + language combo. Network tab: proxy. Save persists all settings and pushes proxy env vars. |
+| `ui/Q_AppMainWindow.{h,cpp}` | Main window: neumorphic three-panel workspace matching the current UI sketch: top input panel with `LOAD FILE` / `TEXT TYPE` / `LOAD AUDIO` / `SETTINGS` pills and a text paste box, central `Script and Sentences` panel with `QListWidget` + word-level colored diff via `HtmlDelegate`, and bottom control panel combining `Q_ShadowingBar` + `Q_PlaybackControlBar`. `onImportFile` dispatches `.txt` → `TextContentProvider`, audio files → `AudioContentProvider`. Constructs both content providers and all controllers in `setupControllers()`. The `File` menu contains only `Settings` and `Exit`; file import is exclusively via the INPUT panel buttons. |
+| `ui/Q_SettingDialog.{h,cpp}` | Tabbed dialog (`General` / `Network` / `About`). General tab: cache/log dirs, TTS engine combo (toggles GCP vs Piper rows), GCP credential, 4-language voice combo with async Google voice discovery (`Q_GCPVoiceLoader`), audio encoding selector (MP3/OGG_OPUS/WAV/MULAW), Piper model path, Whisper model path + language combo. Voice combo is a pure dropdown; on language change it immediately clears and shows "Loading voices..." until the async fetch completes, with a `DefaultVoiceForLanguage()` fallback if the dialog is closed before voices arrive. Network tab: proxy. All config changes use batch mode (`setValueSilent` / `endBatchUpdate`) to trigger a single engine recreation on save. |
 | `ui/Q_ShadowingBar.{h,cpp}` | Record/Stop toggle button, "Play user audio" button, RMS visualizer (`QProgressBar`), analyzing/result labels. Emits `sigStartRecording / sigStopRecording / sigPlayUserAudio`. Slots for `setAmplitude`, `onRecordingFinished`, `onASRAnalysisBusy`, `onASRAnalysisReady(scorePercent)`. `triggerRecording()` public method for programmatic recording start (used by pause-and-repeat mode). |
 | `ui/Q_PlaybackControlBar.{h,cpp}` | Prev / Play-Pause / Next buttons, single-sentence loop checkbox, inter-loop delay spinbox, speed slider (0.5x–2.0x), shadowing mode combo (`Normal` / `Pause-and-Repeat` / `Simultaneous`). |
 | `ui/StyleLoader.h` | Aggregated stylesheet loader. Loads isolated QSS resources from `qss/base/`, `qss/components/`, and `qss/screens/` rather than embedding CSS in C++ code. |
@@ -236,8 +236,8 @@ Main Thread (GUI)
 The current desktop outlook follows `assets/UI diagram.heic` for structure and `assets/UIstyle.jpg` for visual language.
 
 Layout:
-- **Top input panel** — first-viewport input area with title `INPUT`, file import, text-entry submit, settings access, and the text paste box.
-- **Main sequence panel** — dominant sentence-sequence list for imported/generated practice content; this remains the primary work surface.
+- **Top input panel** — file import, text-entry submit, audio import, settings access, and the text paste box. No title label; buttons are 12px font pill controls.
+- **Main sequence panel** — sentence-sequence list titled "Script and Sentences" for imported/generated practice content; this remains the primary work surface.
 - **Bottom control panel** — combines recording controls, RMS feedback, user-recording playback, sentence navigation, loop/delay, speed, and shadowing mode controls.
 
 Style:
@@ -314,6 +314,7 @@ Thread-safe Qt singleton at `~/.config/Thoth/config.json`.
 
 - **Keys** — hierarchical strings (`tts/engine`, `whisper/model_path`, `audio/recorder_sample_rate`, …) defined as `constexpr const char*` in `ConfigKey.h`.
 - **Generic accessors** — `template<T> setValue/getValue` over the JSON tree; `setValue` saves and emits `configChanged(QString)`.
+- **Batch updates** — `setValueSilent(key, value)` writes to the in-memory config without saving or emitting. Callers must invoke `endBatchUpdate()` after all silent sets, which performs a single `save()` and emits `configChanged("settings/batch")`. This prevents signal cascades (e.g., 11 individual `setValue` calls in `Q_SettingDialog::saveSettings` would otherwise trigger 6 `recreateTTSEngine` calls).
 - **Typed accessors** — `getGoogleTTSConfig`, `getWhisperConfig`, `getAudioRecorderConfig`, `getLogConfig` return populated POD structs from `ThothConfig.h`. Each falls back to defaults from `ConfigKey.h` per field.
 - **Path helpers** — `getTempDir`, `getCacheDir = getTempDir/cache`, `getLogDir = getTempDir/log` (overridable via `KEY_LOG_DIR`), `getConfigFilePath`, `getConfigDir`. Temp dir is `/tmp/Thoth/<launchTimestamp>` (POSIX) or `<system-temp>/Thoth/<launchTimestamp>` (Windows); `<launchTimestamp>` is fixed for the process lifetime.
 
@@ -347,7 +348,8 @@ Thread-safe Qt singleton at `~/.config/Thoth/config.json`.
 
 `Q_AppMainWindow::onConfigChanged` switches on the changed key:
 
-- `tts/*` (engine, voice, language, encoding, piper model path) → recreate `ITTSEngine`, recreate `TextContentProvider`, recreate `Q_SessionPlaybackController` with the existing `Q_AudioPlayer`, rebind playback connections, restore the active session.
+- `settings/batch` (from settings dialog) → single `recreateTTSEngine()` + `reloadWhisperConfig()`. All settings dialog changes are batched via `setValueSilent` / `endBatchUpdate` to avoid cascading recreations (previously, 11 individual `setValue` calls triggered 6 sequential engine recreations, causing segfaults when async TTS operations were in flight).
+- `tts/*` (engine, voice, language, encoding, piper model path) → recreate `ITTSEngine`, recreate `TextContentProvider`, replace content provider on `Q_SessionPlaybackController`, rebind playback connections, restore the active session. Used only for fine-grained control changes (e.g., playback rate slider).
 - `whisper/model_path`, `whisper/model_language` → `Q_ASRController::reloadModel(...)` which queues `Q_WhisperWorker::reloadModel` on the worker thread (frees `whisper_context*`; next `doTranscribe` reloads).
 - `network/proxy` → re-export proxy env vars in-process.
 - `playback/rate` → applies `Q_AudioPlayer::setRate()` immediately.
@@ -362,12 +364,14 @@ Thread-safe Qt singleton at `~/.config/Thoth/config.json`.
 | Target | Type | Defined In | Description |
 |--------|------|------------|-------------|
 | `ThothCore` | Static library | `src/core/CMakeLists.txt` | All business logic. `GLOB_RECURSE` over `src/core/*.cpp` (re-run CMake when adding files). |
-| `ThothApp` | Executable | `src/app/CMakeLists.txt` | GUI application |
+| `ThothApp` | Executable | `src/app/CMakeLists.txt` | GUI application. On macOS, a post-build step wraps the debug binary in a minimal `.app` bundle (`Thoth.app/Contents/{MacOS,Resources}` with Info.plist) for proper TSM/IME registration. The `--preset package` preset enables a full macOS `.app` bundle for distribution. |
 | `ThothTests` | Executable | `test/CMakeLists.txt` | GoogleTest binary; `gtest_discover_tests` registers each TEST with CTest (timeout 30 s) |
 | `RunThothTest` | Custom | `test/CMakeLists.txt` | `ctest --output-on-failure` |
 | `ThothDocs` | Custom | root | Doxygen target (working dir `docs/`) |
 | `ThothFormat` | Custom | root | clang-format over `src/**/*.{h,cpp}` and `include/**/*.h` |
 | `ThothClean` | Custom | root | `cmake -E remove_directory ${CMAKE_BINARY_DIR}` |
+
+A developer `Makefile` at the project root wraps CMake presets: `make build`, `make test`, `make run` (uses `open Thoth.app` on macOS), `make lint`, `make format`, `make clean`, `make package`, `make setup`.
 
 ### 6.2 Dependency Management
 
@@ -464,6 +468,11 @@ cmake --build build/debug --target RunThothTest
 | FR-007 | Language detection | ❌ |
 | FR-038 | Session summary | ❌ |
 | NFR-009 | Session persistence across restarts | ❌ Sessions live in memory only |
+| Config | Config change batching | ✅ `ConfigStore::setValueSilent` + `endBatchUpdate` — prevents signal cascades and segfaults during settings save |
+| UI | Settings voice combo safety | ✅ Language change immediately clears voice combo, shows "Loading...", disables until async GCP fetch completes. Falls back to `DefaultVoiceForLanguage()` on premature save |
+| UI | File menu simplification | ✅ Removed "Import File" from File menu; import is via INPUT panel buttons only |
+| macOS | Debug .app bundle | ✅ Post-build step wraps debug binary in minimal `Thoth.app` bundle for macOS TSM/IME registration. `Makefile run` target uses `open Thoth.app` on macOS |
+| Audio | Cache encoding-aware extension | ✅ `AudioCache::_extensionForEncoding()` extracts the encoding from `cacheIdentity` (e.g., `WAV` → `.wav`, `OGG_OPUS` → `.ogg`, `MP3` → `.mp3`). Cached files now have correct extensions matching the configured `audio_encoding`. |
 
 ### 8.3 Not Started
 
@@ -752,19 +761,22 @@ export VCPKG_ROOT=$HOME/vcpkg
 cmake --preset debug
 cmake --build build/debug
 
-# Run tests
-cd build/debug && ctest --output-on-failure
-# or
-cmake --build build/debug --target RunThothTest
+# Or use the developer Makefile
+make build          # Debug build
+make run            # Build + launch (uses open Thoth.app on macOS)
+make test           # Build + run all tests
+make lint           # Run pre-commit hooks
+make format         # clang-format all sources
+make clean          # Remove debug build artifacts
+make clean-all      # Remove all build dirs and dist/
+make package        # Create macOS .dmg distribution
 
-# Format code
-cmake --build build/debug --target ThothFormat
+# Run tests directly
+cd build/debug && ctest --output-on-failure
+cmake --build build/debug --target RunThothTest
 
 # Generate documentation
 cmake --build build/debug --target ThothDocs
-
-# Clean build artifacts
-cmake --build build/debug --target ThothClean
 
 # Re-symlink compile_commands.json for clangd (after configure)
 ln -sf debug/compile_commands.json build/compile_commands.json

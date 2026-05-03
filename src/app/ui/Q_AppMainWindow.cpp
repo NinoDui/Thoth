@@ -95,8 +95,6 @@ void Q_AppMainWindow::setupControllers() {
 
 void Q_AppMainWindow::setupUI() {
     QMenu* fileMenu = menuBar()->addMenu("File");
-    fileMenu->addAction("Import File", this, &Q_AppMainWindow::onImportFile);
-
     fileMenu->addAction("Settings", this, [this]() { openSettingsDialog(); });
 
     fileMenu->addSeparator();
@@ -119,9 +117,6 @@ void Q_AppMainWindow::setupUI() {
     auto* topRow = new QHBoxLayout();
     topRow->setSpacing(12);
 
-    auto* title = new QLabel("INPUT", this);
-    title->setObjectName("screenTitle");
-
     auto* btnImportFile = new QPushButton("LOAD FILE", this);
     btnImportFile->setObjectName("primaryPillButton");
     btnImportFile->setCursor(Qt::PointingHandCursor);
@@ -141,8 +136,6 @@ void Q_AppMainWindow::setupUI() {
     btnSettings->setCursor(Qt::PointingHandCursor);
     connect(btnSettings, &QPushButton::clicked, this, &Q_AppMainWindow::openSettingsDialog);
 
-    topRow->addWidget(title);
-    topRow->addSpacing(8);
     topRow->addWidget(btnImportFile);
     topRow->addWidget(m_btnLoadText);
     topRow->addWidget(m_btnLoadAudio);
@@ -165,7 +158,7 @@ void Q_AppMainWindow::setupUI() {
     sequenceLayout->setSpacing(10);
 
     auto* sequenceHeader = new QHBoxLayout();
-    auto* sequenceTitle = new QLabel("sentence sequence", this);
+    auto* sequenceTitle = new QLabel("Script and Sentences", this);
     sequenceTitle->setObjectName("panelTitle");
     m_lblStatus = new QLabel("No file loaded", this);
     m_lblStatus->setObjectName("statusBadge");
@@ -422,6 +415,14 @@ void Q_AppMainWindow::onConfigChanged(const QString& key) {
     using namespace thoth::config;
     std::string k = key.toStdString();
 
+    // Batch update from settings dialog — apply all TTS/Whisper changes at once.
+    if (k == "settings/batch") {
+        recreateTTSEngine();
+        reloadWhisperConfig();
+        return;
+    }
+
+    // Fine-grained changes from controls (playback rate, mode, etc.)
     if (k == KEY_TTS_ENGINE || k == KEY_TTS_VOICE || k == KEY_TTS_LANG ||
         k == KEY_TTS_AUDIO_ENCODING || k == KEY_TTS_PIPER_MODEL_PATH) {
         recreateTTSEngine();

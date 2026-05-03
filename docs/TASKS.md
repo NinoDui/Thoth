@@ -216,6 +216,22 @@ Acceptance:
 
 ## P2 — Polish & Reliability
 
+- [x] **Config change batching** — `ConfigStore` now supports `setValueSilent()` + `endBatchUpdate()` to prevent signal cascades. `Q_SettingDialog::saveSettings()` uses batch mode, emitting a single `"settings/batch"` signal. `Q_AppMainWindow::onConfigChanged` handles the batch key with one `recreateTTSEngine()` + `reloadWhisperConfig()` call, fixing a segfault caused by 6 sequential engine recreations when async TTS operations were in flight.
+  - `include/thoth/ConfigStore.h`, `src/core/common/ConfigStore.cpp`, `src/app/ui/Q_SettingDialog.cpp`, `src/app/ui/Q_AppMainWindow.cpp`
+- [x] **Voice combo UX safety** — language change in settings dialog immediately clears the voice combo, shows "Loading voices...", and disables it until the async GCP fetch completes. `saveSettings()` falls back to `DefaultVoiceForLanguage()` if the dialog is closed before voices arrive, preventing cross-language voice mismatch errors.
+  - `src/app/ui/Q_SettingDialog.{h,cpp}`
+- [x] **Voice combo is pure dropdown** — removed `setEditable(true)` from `m_comboVoice` so voices are selectable only from the dropdown list.
+  - `src/app/ui/Q_SettingDialog.cpp`
+- [x] **Settings dialog combobox width** — all 5 `QFormLayout`s use `ExpandingFieldsGrow` and all combobox wrapper widgets use `QSizePolicy::Expanding` to fill horizontal space.
+  - `src/app/ui/Q_SettingDialog.cpp`
+- [x] **File menu simplification** — removed "Import File" from the File menu bar; file import is exclusively via the INPUT panel buttons (`LOAD FILE`, `TEXT TYPE`, `LOAD AUDIO`).
+  - `src/app/ui/Q_AppMainWindow.cpp`
+- [x] **macOS debug .app bundle** — post-build CMake step creates a minimal `Thoth.app/Contents/{MacOS,Resources}` with a symlink to the debug binary and Info.plist, fixing `TSMSendMessageToUIServer` / IME registration errors when running from the build directory. `Makefile run` target uses `open Thoth.app` on macOS.
+  - `src/app/CMakeLists.txt`, `Makefile`
+- [x] **UI polish** — hidden "INPUT" title label, renamed "sentence sequence" to "Script and Sentences" (16px font), primary/soft pill button font set to 12px.
+  - `src/app/ui/Q_AppMainWindow.cpp`, `src/app/resources/qss/components/controls.qss`, `src/app/resources/qss/screens/main_window.qss`
+- [x] **Audio cache encoding-aware file extension** — cached TTS audio files now use the correct extension (`.mp3`, `.ogg`, `.wav`) based on the `audio_encoding` config setting rather than always `.mp3`. Extension is extracted from the engine's `cacheIdentity` string.
+  - `src/core/services/AudioCache.cpp`, `src/core/internal/AudioCache.h`
 - [x] **Main-window UI outlook refresh**
   - Implemented the UI sketch from `assets/UI diagram.heic`: top input panel, central sentence-sequence panel, and bottom control panel.
   - Applied the reference tactile/neumorphic look from `assets/UIstyle.jpg`: off-white surfaces, rounded panels, pill controls, visible focus states, subtle borders, and panel shadows.

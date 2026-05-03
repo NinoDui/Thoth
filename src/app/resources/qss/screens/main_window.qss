@@ -9,7 +9,7 @@ QFrame#controlPanel {
 
 /* ─── Screen title (INPUT) ─── */
 QLabel#screenTitle {
-    font-size: 28px;
+    font-size: 18px;
     font-weight: 700;
     color: #101010;
     letter-spacing: -0.5px;
