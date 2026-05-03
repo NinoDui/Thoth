@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "thoth/ISentenceScorer.h"
+
 struct TimeRange {
     double startMs = 0.0;
     double endMs = 0.0;
@@ -26,6 +28,7 @@ struct RecordedSentence : Sentence {
     std::filesystem::path localShadowingPath;
     double shadowingScore = 0.0;
     std::optional<std::string> transcribedText;
+    std::optional<ScoringResult> scoringDetail;
 };
 
 class Session {

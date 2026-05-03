@@ -1,5 +1,6 @@
 # Target-3, Thoth Unit Tests
-add_executable(ThothTests
+add_executable(
+    ThothTests
     WAVTest.cpp
     WERScorerTest.cpp
     TextParserTest.cpp
@@ -12,35 +13,36 @@ if(MSVC)
 endif()
 
 # for access to src/core
-target_include_directories(ThothTests PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/src/core
+target_include_directories(
+    ThothTests PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src/core
 )
 
-target_link_libraries(ThothTests PRIVATE
-    ThothCore
-    GTest::gtest
-    GTest::gmock
-    Qt6::Core
-    Qt6::Test
+target_link_libraries(
+    ThothTests
+    PRIVATE ThothCore
+            GTest::gtest
+            GTest::gmock
+            Qt6::Core
+            Qt6::Test
 )
 
-target_compile_definitions(ThothTests PRIVATE
-    TEST_RESOURCE_DIR="${CMAKE_SOURCE_DIR}/test/resources"
+target_compile_definitions(
+    ThothTests PRIVATE TEST_RESOURCE_DIR="${CMAKE_SOURCE_DIR}/test/resources"
 )
 
 include(GoogleTest)
 include(CTest)
 
 # Discover and register tests with CTest
-gtest_discover_tests(ThothTests
-    DISCOVERY_TIMEOUT 60
+gtest_discover_tests(
+    ThothTests DISCOVERY_TIMEOUT 60
     PROPERTIES
-        TIMEOUT 30
+    TIMEOUT 30
 )
 
 # Add custom test target for convenience
-add_custom_target(RunThothTest
+add_custom_target(
+    RunThothTest
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
     DEPENDS ThothTests
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

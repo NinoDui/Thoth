@@ -35,6 +35,10 @@ class Q_SessionPlaybackController : public QObject {
     // Loop control
     void setLoopSingle(bool enable, int delaySeconds = 0);
 
+    // Shadowing mode
+    void setMode(const std::string& mode);
+    [[nodiscard]] std::string mode() const;
+
     // Suspend auto-advance so an external caller can use the audio player directly
     // without triggering playNext(). Resets automatically when playSentence() is called.
     void suspendAutoAdvance();
@@ -56,6 +60,7 @@ class Q_SessionPlaybackController : public QObject {
     void sentencePlayStopped(int idx);
     void statusMessageChanged(const QString& message);
     void errorOccurred(const QString& message);
+    void repeatRequested(int idx);
 
    private slots:
     void _onPlayerFinished();
@@ -82,6 +87,8 @@ class Q_SessionPlaybackController : public QObject {
     int m_loopDelaySeconds = 0;
 
     bool m_autoAdvance = true;
+
+    std::string m_mode = "normal";  // normal | pause-and-repeat | simultaneous
 
     static constexpr int DEFAULT_START_IDX = 0;
     static constexpr int PRELOAD_WINDOW = 3;

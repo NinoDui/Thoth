@@ -54,7 +54,7 @@ void Q_SettingDialog::setupUI() {
     m_comboTTSEngine = new QComboBox();
     m_comboTTSEngine->addItems({"gcp", "piper"});
     m_comboLanguage = new QComboBox();
-    m_comboLanguage->addItems({"en-US", "zh-CN", "ja-JP"});
+    m_comboLanguage->addItems({"en-US", "sv-SE", "zh-CN", "ja-JP", "ko-KR"});
     m_comboVoice = new QComboBox();
     m_comboVoice->setEditable(true);
     m_editPiperModelPath = new QLineEdit();
@@ -64,6 +64,20 @@ void Q_SettingDialog::setupUI() {
     ttsLayout->addRow("Language:", m_comboLanguage);
     ttsLayout->addRow("Voice Name:", m_comboVoice);
     ttsLayout->addRow("Piper Model:", createBrowseRow("PiperModel", m_editPiperModelPath, false));
+
+    connect(m_comboLanguage, &QComboBox::currentTextChanged, [this](const QString& lang) {
+        std::string defaultVoice = thoth::config::DefaultVoiceForLanguage(lang.toStdString());
+        m_comboVoice->setCurrentText(QString::fromStdString(defaultVoice));
+    });
+
+    auto* asrGroup = new QGroupBox("Speech Recognition", generalTab);
+    auto* asrLayout = new QFormLayout(asrGroup);
+    m_editWhisperModelPath = new QLineEdit();
+    asrLayout->addRow("Whisper Model:",
+                      createBrowseRow("WhisperModel", m_editWhisperModelPath, false));
+    m_comboWhisperLanguage = new QComboBox();
+    m_comboWhisperLanguage->addItems({"en", "sv", "zh", "ja", "ko"});
+    asrLayout->addRow("Language:", m_comboWhisperLanguage);
 
     auto* configFileGroup = new QGroupBox("Configuration File", generalTab);
     auto* configFileLayout = new QFormLayout(configFileGroup);
@@ -75,6 +89,7 @@ void Q_SettingDialog::setupUI() {
 
     generalLayout->addWidget(pathGroup);
     generalLayout->addWidget(ttsGroup);
+    generalLayout->addWidget(asrGroup);
     generalLayout->addWidget(configFileGroup);
     generalLayout->addStretch();
 
@@ -134,6 +149,10 @@ void Q_SettingDialog::loadSettings() {
         getStr(thoth::config::KEY_TTS_ENGINE, thoth::config::DEFAULT_TTS_ENGINE));
     m_editPiperModelPath->setText(getStr(thoth::config::KEY_TTS_PIPER_MODEL_PATH,
                                          thoth::config::DEFAULT_TTS_PIPER_MODEL_PATH));
+    m_editWhisperModelPath->setText(
+        getStr(thoth::config::KEY_WHISPER_MODEL_PATH, thoth::config::DEFAULT_WHISPER_MODEL_PATH));
+    m_comboWhisperLanguage->setCurrentText(getStr(thoth::config::KEY_WHISPER_MODEL_LANGUAGE,
+                                                  thoth::config::DEFAULT_WHISPER_MODEL_LANGUAGE));
 
     m_editProxy->setText(getStr(thoth::config::KEY_PROXY));
 }
@@ -156,6 +175,10 @@ void Q_SettingDialog::saveSettings() {
     store.setValue(thoth::config::KEY_TTS_ENGINE, m_comboTTSEngine->currentText().toStdString());
     store.setValue(thoth::config::KEY_TTS_PIPER_MODEL_PATH,
                    m_editPiperModelPath->text().toStdString());
+    store.setValue(thoth::config::KEY_WHISPER_MODEL_PATH,
+                   m_editWhisperModelPath->text().toStdString());
+    store.setValue(thoth::config::KEY_WHISPER_MODEL_LANGUAGE,
+                   m_comboWhisperLanguage->currentText().toStdString());
 
     store.setValue(thoth::config::KEY_PROXY, m_editProxy->text().toStdString());
 

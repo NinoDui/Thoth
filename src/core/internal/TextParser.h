@@ -16,6 +16,7 @@ class TextParser {
     ~TextParser();
 
     std::vector<std::string> parseFile(const std::filesystem::path& path);
+    std::vector<std::string> parseText(std::string_view text);
 
    private:
     std::unique_ptr<Segmenter> _segmenter;

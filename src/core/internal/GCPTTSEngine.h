@@ -8,7 +8,7 @@
 
 class GCPTTSEngine : public thoth::ITTSEngine {
    public:
-    explicit GCPTTSEngine(const ConfigStore::GoogleTTSConfig& config);
+    explicit GCPTTSEngine(const thoth::GoogleTTSConfig& config);
     ~GCPTTSEngine() override = default;
 
     thoth::TTSAudioResult synthesize(const std::string& text) override;
@@ -17,5 +17,5 @@ class GCPTTSEngine : public thoth::ITTSEngine {
 
    private:
     std::unique_ptr<GCPTextToSpeechClient> m_client;
-    ConfigStore::GoogleTTSConfig m_config;
+    thoth::GoogleTTSConfig m_config;
 };

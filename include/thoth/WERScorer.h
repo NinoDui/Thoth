@@ -7,8 +7,9 @@
 
 class WERScorer : public ISentenceScorer {
    public:
-    double score(const std::string& reference,
-                 const std::string& hypothesis) const override;
+    double score(const std::string& reference, const std::string& hypothesis) const override;
+    ScoringResult scoreDetail(const std::string& reference,
+                              const std::string& hypothesis) const override;
     std::string name() const override;
 
    private:
@@ -16,4 +17,6 @@ class WERScorer : public ISentenceScorer {
     static std::vector<std::string> tokenize(const std::string& text);
     static size_t editDistance(const std::vector<std::string>& ref,
                                const std::vector<std::string>& hyp);
+    static ScoringResult alignTokens(const std::vector<std::string>& ref,
+                                     const std::vector<std::string>& hyp);
 };

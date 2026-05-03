@@ -2,12 +2,21 @@
 
 #include <spdlog/spdlog.h>
 
+#include <chrono>
 #include <cstdlib>
+#include <format>
 #include <fstream>
 
 #include "thoth/ConfigKey.h"
 
 namespace fs = std::filesystem;
+
+namespace {
+const std::string& launchTimestamp() {
+    static const std::string ts = std::format("{:%Y%m%d%H%M%S}", std::chrono::system_clock::now());
+    return ts;
+}
+}  // namespace
 
 ConfigStore& ConfigStore::instance() {
     static ConfigStore instance;
@@ -63,7 +72,11 @@ void ConfigStore::save() {
 }
 
 std::filesystem::path ConfigStore::getTempDir() const {
-    return fs::temp_directory_path() / "Thoth";
+#ifdef _WIN32
+    return fs::temp_directory_path() / "Thoth" / launchTimestamp();
+#else
+    return fs::path("/tmp") / "Thoth" / launchTimestamp();
+#endif
 }
 
 std::filesystem::path ConfigStore::getConfigDir() const { return m_configPath.parent_path(); }
@@ -71,9 +84,9 @@ std::filesystem::path ConfigStore::getCacheDir() const { return getTempDir() / "
 std::filesystem::path ConfigStore::getLogDir() const { return getTempDir() / "log"; }
 std::filesystem::path ConfigStore::getConfigFilePath() const { return m_configPath; }
 
-ConfigStore::GoogleTTSConfig ConfigStore::getGoogleTTSConfig() const {
+thoth::GoogleTTSConfig ConfigStore::getGoogleTTSConfig() const {
     std::lock_guard<std::mutex> lock(m_configMutex);
-    return GoogleTTSConfig{
+    return thoth::GoogleTTSConfig{
         .languageCode =
             m_config.value(thoth::config::KEY_TTS_LANG, thoth::config::DEFAULT_TTS_LANG),
         .voiceName = m_config.value(thoth::config::KEY_TTS_VOICE, thoth::config::DEFAULT_TTS_VOICE),
@@ -82,7 +95,7 @@ ConfigStore::GoogleTTSConfig ConfigStore::getGoogleTTSConfig() const {
     };
 }
 
-ConfigStore::LogConfig ConfigStore::getLogConfig() const {
+thoth::LogConfig ConfigStore::getLogConfig() const {
     std::lock_guard<std::mutex> lock(m_configMutex);
 
     // specify the default or user-defined log directory
@@ -99,7 +112,7 @@ ConfigStore::LogConfig ConfigStore::getLogConfig() const {
                 e.what(), logDirPath.string());
         }
     }
-    return LogConfig{
+    return thoth::LogConfig{
         .level = m_config.value(thoth::config::KEY_LOG_LEVEL, thoth::config::DEFAULT_LOG_LEVEL),
         .pattern =
             m_config.value(thoth::config::KEY_LOG_PATTERN, thoth::config::DEFAULT_LOG_PATTERN),

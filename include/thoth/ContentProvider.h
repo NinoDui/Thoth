@@ -28,6 +28,7 @@ class IContentProvider {
     virtual ~IContentProvider() = default;
     virtual void load(const std::filesystem::path& inputMediaPath,
                       std::function<void(Session)> onReady) = 0;
+    virtual void loadFromText(std::string_view text, std::function<void(Session)> onReady) = 0;
     virtual void prepareAudio(
         Sentence& sentence,
         std::function<void(bool success, const QString& errorMsg)> callback) = 0;
@@ -47,6 +48,7 @@ class TextContentProvider : public IContentProvider {
 
     void load(const std::filesystem::path& inputMediaPath,
               std::function<void(Session)> onReady) override;
+    void loadFromText(std::string_view text, std::function<void(Session)> onReady) override;
     void prepareAudio(Sentence& sentence,
                       std::function<void(bool success, const QString& errorMsg)> callback) override;
 

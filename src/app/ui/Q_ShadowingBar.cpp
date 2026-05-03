@@ -14,6 +14,12 @@ Q_ShadowingBar::Q_ShadowingBar(QWidget* parent) : QWidget(parent) {
 
 Q_ShadowingBar::~Q_ShadowingBar() = default;
 
+void Q_ShadowingBar::triggerRecording() {
+    if (!m_isRecording) {
+        onRecordBtnClicked();
+    }
+}
+
 void Q_ShadowingBar::reset() {
     m_isRecording = false;
 
@@ -123,7 +129,6 @@ void Q_ShadowingBar::onASRAnalysisBusy(bool busy) {
 
 void Q_ShadowingBar::onASRAnalysisReady(double scorePercent) {
     m_lblAnalyzing->setVisible(false);
-    m_lblAnalysisResult->setText(
-        QString("Score: %1%").arg(static_cast<int>(scorePercent)));
+    m_lblAnalysisResult->setText(QString("Score: %1%").arg(static_cast<int>(scorePercent)));
     m_lblAnalysisResult->setVisible(true);
 }

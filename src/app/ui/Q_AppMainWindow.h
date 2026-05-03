@@ -5,6 +5,7 @@
 #include <QListWidget>
 #include <QMainWindow>
 #include <QMediaPlayer>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QVBoxLayout>
@@ -49,10 +50,13 @@ class Q_AppMainWindow : public QMainWindow {
 
     void updateContentList();
     void openSettingsDialog();
+    void restorePlaybackSettings();
 
     QWidget* m_centralWidget;
     QLabel* m_lblStatus;
     QListWidget* m_lstContent;
+    QPlainTextEdit* m_txtInput;
+    QPushButton* m_btnLoadText;
     Q_PlaybackControlBar* m_playbackControlBar;
     Q_ShadowingBar* m_shadowingBar;
 

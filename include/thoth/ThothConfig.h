@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 
 namespace thoth {
@@ -16,6 +17,20 @@ struct AudioRecorderConfig {
 struct WhisperConfig {
     std::string modelPath = "models/ggml-base.en.bin";
     std::string language = "en";
+};
+
+struct GoogleTTSConfig {
+    std::string languageCode;
+    std::string voiceName;
+    std::string audioEncoding;
+};
+
+struct LogConfig {
+    std::string level;
+    std::string pattern;
+    bool toConsole;
+    bool toFile;
+    std::filesystem::path logDir;
 };
 
 }  // namespace thoth

@@ -15,6 +15,8 @@ class Q_ShadowingBar : public QWidget {
 
     void reset();
 
+    void triggerRecording();
+
    public slots:
     // called by core
     void setAmplitude(float amplitude);

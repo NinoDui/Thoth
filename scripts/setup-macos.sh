@@ -5,6 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC2034  # used by commented-out vcpkg install block below
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # 1. Check Xcode Command Line Tools

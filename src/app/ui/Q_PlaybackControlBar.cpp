@@ -1,5 +1,7 @@
 #include "Q_PlaybackControlBar.h"
 
+#include <algorithm>
+
 Q_PlaybackControlBar::Q_PlaybackControlBar(QWidget* parent) : QWidget(parent) {
     setupUI();
     setupConnections();
@@ -30,7 +32,7 @@ void Q_PlaybackControlBar::setupUI() {
     m_chkLoop = new QCheckBox("SingleLoop", this);
 
     // [delay] spinbox
-    QLabel* lblDelay = new QLabel("Delay (seconds):", this);
+    QLabel* lblDelay = new QLabel("Delay (s):", this);
     m_spinDelay = new QSpinBox(this);
     m_spinDelay->setRange(0, 5 * 60);
     m_spinDelay->setSuffix("s");
@@ -38,10 +40,32 @@ void Q_PlaybackControlBar::setupUI() {
     m_spinDelay->setFixedWidth(60);
     m_spinDelay->setToolTip("Delay interval between sentences");
 
+    // [rate] slider
+    m_lblRate = new QLabel("1.0x", this);
+    m_lblRate->setFixedWidth(40);
+    m_lblRate->setAlignment(Qt::AlignCenter);
+    m_sliderRate = new QSlider(Qt::Horizontal, this);
+    m_sliderRate->setRange(50, 200);  // 0.5x to 2.0x
+    m_sliderRate->setValue(100);
+    m_sliderRate->setFixedWidth(100);
+    m_sliderRate->setToolTip("Playback speed");
+
+    // [mode] combo
+    m_comboMode = new QComboBox(this);
+    m_comboMode->addItems({"Normal", "Pause-and-Repeat", "Simultaneous"});
+    m_comboMode->setToolTip("Shadowing mode");
+
     // Layout
     layout->addWidget(m_btnPrev);
     layout->addWidget(m_btnPlayPause);
     layout->addWidget(m_btnNext);
+
+    layout->addStretch();
+
+    layout->addWidget(m_lblRate);
+    layout->addWidget(m_sliderRate);
+
+    layout->addWidget(m_comboMode);
 
     layout->addStretch();
 
@@ -70,6 +94,13 @@ void Q_PlaybackControlBar::setupConnections() {
         m_loopDelay = value;
         emit sigDelayChanged(value);
     });
+    connect(m_sliderRate, &QSlider::valueChanged, [this](int value) {
+        double rate = value / 100.0;
+        m_lblRate->setText(QString("%1x").arg(rate, 0, 'f', 1));
+        emit sigRateChanged(rate);
+    });
+    connect(m_comboMode, &QComboBox::currentTextChanged, this,
+            &Q_PlaybackControlBar::sigModeChanged);
 }
 
 void Q_PlaybackControlBar::setPlayingState(bool isPlaying) {
@@ -80,3 +111,15 @@ void Q_PlaybackControlBar::setPlayingState(bool isPlaying) {
 
 bool Q_PlaybackControlBar::loopMode() const { return m_singleLoop; }
 int Q_PlaybackControlBar::loopDelay() const { return m_loopDelay; }
+double Q_PlaybackControlBar::playbackRate() const { return m_sliderRate->value() / 100.0; }
+
+void Q_PlaybackControlBar::setPlaybackRate(double rate) {
+    int val = static_cast<int>(rate * 100.0);
+    val = std::clamp(val, m_sliderRate->minimum(), m_sliderRate->maximum());
+    m_sliderRate->setValue(val);
+    m_lblRate->setText(QString("%1x").arg(val / 100.0, 0, 'f', 1));
+}
+
+void Q_PlaybackControlBar::setDisplayMode(const QString& mode) {
+    m_comboMode->setCurrentText(mode);
+}

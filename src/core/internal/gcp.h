@@ -10,9 +10,9 @@
 
 class GCPTextToSpeechClient {
    public:
-    explicit GCPTextToSpeechClient(const ConfigStore::GoogleTTSConfig& config);
+    explicit GCPTextToSpeechClient(const thoth::GoogleTTSConfig& config);
     explicit GCPTextToSpeechClient(const google::cloud::texttospeech_v1::TextToSpeechClient& client,
-                                   const ConfigStore::GoogleTTSConfig& config);
+                                   const thoth::GoogleTTSConfig& config);
 
     ~GCPTextToSpeechClient() = default;
 
@@ -20,5 +20,5 @@ class GCPTextToSpeechClient {
 
    private:
     google::cloud::texttospeech_v1::TextToSpeechClient m_client;
-    ConfigStore::GoogleTTSConfig m_config;
+    thoth::GoogleTTSConfig m_config;
 };
