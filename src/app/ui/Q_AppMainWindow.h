@@ -17,6 +17,7 @@ class Q_SessionPlaybackController;
 class Q_AudioPlayer;
 class Q_PlaybackControlBar;
 class TextContentProvider;
+class AudioContentProvider;
 class Q_ShadowingBar;
 class Q_RecordController;
 class Q_ASRController;
@@ -63,6 +64,7 @@ class Q_AppMainWindow : public QMainWindow {
     int m_lastHighlightedIdx = -1;
 
     std::unique_ptr<TextContentProvider> m_textContentProvider;
+    std::unique_ptr<AudioContentProvider> m_audioContentProvider;
     std::unique_ptr<Q_AudioPlayer> m_audioPlayer;
     std::unique_ptr<Q_SessionPlaybackController> m_sessionPlaybackController;
     std::unique_ptr<Q_RecordController> m_recordController;

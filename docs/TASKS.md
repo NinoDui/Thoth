@@ -55,20 +55,161 @@ All P0 items implemented. Summary of key changes:
 - [x] **Playback settings persistence** — `KEY_PLAYBACK_RATE` and `KEY_PLAYBACK_MODE` restored on startup via `restorePlaybackSettings()`.
   - `src/app/ui/Q_AppMainWindow.cpp`
 
-## P1 — Audio-Input Gap Closure (Phase 2 per PDD §15)
+## P1 — Audio-Input Gap Closure (Phase 2 per PDD §15) ✅ CORE COMPLETE (P1.1–P1.7 done; P1.8–P1.9 pending)
 
 These add the audio-import workflow PRD requires (FR-003 family).
 
-- [ ] **Audio file import** (FR-003)
-  - Extend `Q_AppMainWindow::onImportFile` to accept `*.mp3 *.wav *.m4a *.flac` and dispatch to a new `IContentProvider` implementation (e.g. `AudioContentProvider`).
-  - Decode with Qt Multimedia (`QAudioDecoder`) or a small ffmpeg/miniaudio shim — keep the choice behind the new provider class.
-- [ ] **Source-audio STT transcription** (FR-009, FR-017, FR-018, FR-020)
-  - Make `Q_WhisperWorker` accept a generic input path (currently it expects a `RecordedSentence*` flow). Either add an overload or split the worker.
-  - Flip `wparams.print_timestamps = true` for this path (`src/core/internal/Q_WhisperWorker.cpp:58`) so segment timing is captured.
-  - Stream the segment list back out (new signal `transcriptSegmentsReady(...)`).
-- [ ] **Audio-text alignment** (FR-021)
-  - Map Whisper segment timestamps onto sentence boundaries, populate `Sentence::audioRange` (`include/thoth/Entity.h`), so `Q_SessionPlaybackController` can play original audio slices instead of TTS.
-  - Add an `IContentProvider::prepareAudio` branch that returns the source-audio path with a `QMediaPlayer::setPosition` hint (or extend `Q_AudioPlayer` with `play(path, startMs, endMs)`).
+### P1 Implementation Plan
+
+Goal: import a local audio file, transcribe it locally with Whisper, segment the transcript into playable sentences, and use the original source audio as the reference instead of generating TTS.
+
+#### P1.1 — Audio Import Routing ✅
+
+- [x] Extend `Q_AppMainWindow::onImportFile` to accept `*.txt *.mp3 *.wav *.m4a *.flac`.
+- [x] Dispatch by suffix:
+  - `.txt` keeps the existing `TextContentProvider` path.
+  - `.mp3`, `.wav`, `.m4a`, `.flac` use the new `AudioContentProvider`.
+- [ ] Enforce the PRD audio limit before transcription:
+  - Reject files longer than 20 minutes when duration metadata is available.
+  - Reject unsupported / unreadable files with a user-visible error.
+- [ ] Keep `Session::inputMediaPath` prefixed as `audio://<absolute-path>` for audio sessions.
+
+Acceptance:
+- Import dialog shows text + audio file formats.
+- Selecting an audio file starts an "importing / transcribing" state instead of trying to parse it as text.
+- Invalid audio files do not crash the app and produce a clear status/error message.
+
+#### P1.2 — Audio Content Provider ✅
+
+- [x] Add `AudioContentProvider : IContentProvider`.
+- [x] Ownership:
+  - Store the original source audio path.
+  - Build `Session::sentences` from timestamped Whisper transcript segments.
+  - Populate each `Sentence::audioRange`.
+  - Set each `Sentence::localAudioPath` to the original source audio path.
+- [x] `loadFromText()` is a no-op for `AudioContentProvider`; text input remains owned by `TextContentProvider`.
+- [x] `prepareAudio()` for audio sessions does not call TTS. It validates source file exists and `audioRange` is present.
+- [x] Logging distinguishes audio-source reference playback from TTS.
+
+Acceptance:
+- Audio sessions produce a non-empty `Session` when Whisper returns transcript text.
+- `prepareAudio()` for an audio sentence never writes to the TTS audio cache.
+- If the source file is moved/deleted after import, playback reports a clear error.
+
+#### P1.3 — Source-Audio Whisper Transcription ✅
+
+- [x] Split the current scoring-only `Q_WhisperWorker` API by adding a source-audio transcription path:
+  - Keep `doTranscribe(RecordedSentence*)` unchanged for user recording scoring.
+  - Add `doTranscribeFile(QString audioPath)` worker slot for source audio import.
+- [x] Introduced `TranscriptSegment { std::string text; double startMs; double endMs; }` in `Entity.h`.
+- [x] For source-audio transcription:
+  - Decodes WAV to 16 kHz mono float PCM (resamples if needed) before calling Whisper.
+  - `wparams.print_timestamps = true`.
+  - Emits `transcriptSegmentsReady(std::vector<TranscriptSegment>)`.
+- [x] Model reload behavior unchanged.
+- [x] Worker errors surfaced via `errorOccurred` signal forwarded through `AudioContentProvider`.
+
+Acceptance:
+- `.wav` source audio can be transcribed through the new file path without constructing a fake `RecordedSentence`.
+- Timestamped segments are emitted in source order with non-negative `startMs <= endMs`.
+- The existing recording-scoring path still passes current ASR/scoring tests.
+
+#### P1.4 — Decode / Resample Strategy (WAV complete; non-WAV pending)
+
+- [x] WAV decode path: `WAV::decode` used in `Q_WhisperWorker::doTranscribeFile`.
+- [x] Resampling to 16 kHz mono: implemented `WAV::resample` with linear interpolation in `WAV.cpp`.
+- [ ] Non-WAV formats (MP3/M4A/FLAC): `QAudioDecoder`-based helper not yet implemented; unsupported files return a clear error message.
+- [x] Decoder stays internal to `Q_WhisperWorker`, not exposed to `Q_AppMainWindow`.
+- [x] Clear error messages for unsupported codecs and decode failures.
+
+Acceptance:
+- WAV import works in unit/integration tests without platform codec dependencies.
+- MP3/M4A/FLAC support is handled through Qt and fails cleanly if the platform codec is unavailable.
+
+#### P1.5 — Transcript Segmentation and Alignment ✅
+
+- [x] Uses Whisper timestamp segments as sentence boundaries.
+- [x] Segments with multiple sentences are split via `TextParser::parseText()` with time divided proportionally by character count.
+- [x] Multiple Whisper segments merged into one sentence when no sentence-ending punctuation found until end of group.
+- [x] Populates `Sentence::id`, `text`, `audioRange`, `localAudioPath`.
+- [x] Empty transcript fragments dropped.
+
+Acceptance:
+- Every audio-imported sentence has text, source path, and an audio range.
+- Sentence order matches audio order.
+- No generated TTS cache path is assigned to audio-imported sentences.
+
+#### P1.6 — Range Playback ✅
+
+- [x] `Q_AudioPlayer::play(path, startMs, endMs)` added.
+  - Sets source, defers play+seek to `LoadedMedia` status event.
+  - `QTimer` stops playback at `endMs` and emits `finished()`.
+- [x] `Q_SessionPlaybackController::playSentence()` checks `sentence.audioRange` and calls range play if set.
+- [x] Prefetch for audio-range sentences calls `prepareAudio()` which is a fast file-existence check (near-instant).
+
+Acceptance:
+- Double-clicking an audio-imported sentence plays only that source-audio slice.
+- Next / previous / loop / pause-and-repeat modes continue to work for audio sessions.
+- Existing text/TTS playback behavior is unchanged.
+
+#### P1.7 — UI State and Errors (partial)
+
+- [x] Status messages: "Transcribing audio: <filename> …" shown during import; "Loaded N sentences" on success; "Import failed — no sentences found" on failure.
+- [ ] Disable playback/record buttons while source-audio transcription is running.
+- [x] Reuses existing sentence list rendering and scoring UI after import.
+- [ ] `QMessageBox` for blocking import failures (currently uses status label only).
+
+Acceptance:
+- User cannot start playback before an audio session is ready.
+- Failed audio import leaves the previous session intact.
+
+#### P1.8 — Language Detection
+
+- [ ] Text input: add a small Unicode-block heuristic for initial language selection only; manual settings remain authoritative.
+- [ ] Audio input: default to configured Whisper language for P1.
+- [ ] Do not enable Whisper `"auto"` by default until the model/metadata path can report a reliable detected language to the UI.
+- [ ] Record the chosen language in logs for each import.
+
+Acceptance:
+- P1 does not silently change the user's configured language.
+- Audio import works with the current configured Whisper model/language.
+
+#### P1.9 — Tests
+
+- [ ] Unit tests:
+  - `AudioContentProvider` builds a `Session` from fixture transcript segments.
+  - Audio `prepareAudio()` validates source path and does not invoke TTS.
+  - Alignment handles split, merge, empty, and punctuation-only transcript fragments.
+  - `Q_AudioPlayer` range-stop behavior is covered where Qt test support permits.
+- [ ] Integration tests:
+  - Import a small WAV fixture and assert non-empty timestamped transcript output when a test Whisper model is available.
+  - Keep this test skipped when no model fixture is configured.
+- [ ] Regression tests:
+  - Existing text import + TTS path still uses `TextContentProvider`.
+  - Existing recording scoring still uses `RecordedSentence*` and does not require source-audio DTOs.
+- [ ] Verification commands:
+  - `cmake --build build/debug --target ThothTests ThothApp`
+  - `ctest --test-dir build/debug --output-on-failure`
+
+#### P1 Delivery Order
+
+1. Add DTOs and source-audio transcription worker path behind tests.
+2. Add `AudioContentProvider` with fixture-driven transcript/alignment tests.
+3. Add range playback support in `Q_AudioPlayer` and `Q_SessionPlaybackController`.
+4. Wire `Q_AppMainWindow::onImportFile` routing and UI status/errors.
+5. Add codec support for non-WAV formats through the internal decoder helper.
+6. Add language detection heuristic after the audio import path is stable.
+
+- [x] **Audio file import** (FR-003)
+  - `Q_AppMainWindow::onImportFile` accepts `*.txt *.wav *.mp3 *.m4a *.flac` and dispatches to `AudioContentProvider` for audio files.
+  - WAV decode via existing `WAV::decode`; non-WAV returns a clear error (QAudioDecoder path pending).
+- [x] **Source-audio STT transcription** (FR-009, FR-017, FR-018, FR-020)
+  - `Q_WhisperWorker::doTranscribeFile(QString)` added alongside existing `doTranscribe(RecordedSentence*)`.
+  - `wparams.print_timestamps = true` in the new path.
+  - `transcriptSegmentsReady(std::vector<TranscriptSegment>)` signal forwarded through `Q_ASRController`.
+- [x] **Audio-text alignment** (FR-021)
+  - Whisper segments merged/split into `Sentence` objects with `audioRange` populated.
+  - `Q_AudioPlayer::play(path, startMs, endMs)` added; `Q_SessionPlaybackController` uses it when `audioRange` is set.
 - [ ] **Language detection** (FR-007)
   - Heuristic on imported text (Unicode block survey) + manual override via the language combo.
   - For audio: rely on Whisper's `lang_id` (set `wparams.language = "auto"` and read back the detected language), or skip until model size justifies it.
@@ -87,9 +228,9 @@ These add the audio-import workflow PRD requires (FR-003 family).
 - [ ] **Piper TTS synthesis** (FR-013) — `isAvailable()` already done; only the inference path remains
   - Replace the warning-and-empty-return in `src/core/services/PiperTTSEngine.cpp::synthesize` with actual Piper ONNX inference.
   - Decide on dependency strategy (link `libpiper_phonemize` + ONNX Runtime via vcpkg, or shell out to a `piper` binary).
-- [ ] **WAV resampling** (closes a stub)
-  - Implement `WAV::resample` in `src/core/entities/WAV.cpp` (currently returns input or empty).
-  - Sinc or polyphase filter; needed once arbitrary audio import lands so Whisper's 16 kHz expectation is met.
+- [x] **WAV resampling** (closes a stub)
+  - Implemented `WAV::resample` in `src/core/entities/WAV.cpp` with linear interpolation.
+  - Used by `Q_WhisperWorker::doTranscribeFile` to convert source audio to 16 kHz before Whisper inference.
 - [ ] **Config import / export** (NFR-012)
   - "Export settings" / "Import settings" entries in `Q_SettingDialog` that copy `~/.config/Thoth/config.json` to/from a user-chosen path.
 - [ ] **Wire or remove `Q_AppMainWindow::onExportAudio`** (engineering — no PRD ref)

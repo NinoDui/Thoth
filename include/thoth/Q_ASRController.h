@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QString>
 #include <QThread>
 
 #include "thoth/Entity.h"
@@ -17,15 +18,18 @@ class Q_ASRController : public QObject {
     ~Q_ASRController();
 
     void analyze(RecordedSentence* rs);
+    void transcribeFile(const QString& audioPath);
     void reloadModel(const thoth::WhisperConfig& config);
 
    signals:
     void analysisReady(RecordedSentence* rs);
+    void transcriptSegmentsReady(std::vector<TranscriptSegment> segments);
     void busyChanged(bool busy);
     void errorOccurred(const QString& message);
 
     // internal — bridges main thread to worker thread
     void sigTranscribe(RecordedSentence* rs);
+    void sigTranscribeFile(const QString& audioPath);
 
    private slots:
     void onTranscriptReady(RecordedSentence* rs);

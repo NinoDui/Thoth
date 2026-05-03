@@ -3,6 +3,7 @@
 #include <QAudioFormat>
 #include <QCoreApplication>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QStyle>
@@ -12,6 +13,7 @@
 #include "Q_PlaybackControlBar.h"
 #include "Q_SettingDialog.h"
 #include "Q_ShadowingBar.h"
+#include "thoth/AudioContentProvider.h"
 #include "thoth/ConfigKey.h"
 #include "thoth/ConfigStore.h"
 #include "thoth/ContentProvider.h"
@@ -50,6 +52,9 @@ void Q_AppMainWindow::setupControllers() {
 
     auto cacheDir = config.getCacheDir() / "audio" / config.getTTSEngineName();
     m_textContentProvider = std::make_unique<TextContentProvider>(ttsEngine, cacheDir);
+    m_werScorer = std::make_unique<WERScorer>();
+    m_asrController = std::make_unique<Q_ASRController>(m_werScorer.get(), whisperConfig);
+    m_audioContentProvider = std::make_unique<AudioContentProvider>(m_asrController.get());
     m_audioPlayer = std::make_unique<Q_AudioPlayer>();
 
     m_sessionPlaybackController = std::make_unique<Q_SessionPlaybackController>(
@@ -72,9 +77,6 @@ void Q_AppMainWindow::setupControllers() {
     }(audioConfig.sampleFormatBits));
 
     m_recordController = std::make_unique<Q_RecordController>(recordFormat, audioConfig.rmsStep);
-
-    m_werScorer = std::make_unique<WERScorer>();
-    m_asrController = std::make_unique<Q_ASRController>(m_werScorer.get(), whisperConfig);
 }
 
 void Q_AppMainWindow::setupUI() {
@@ -405,22 +407,24 @@ void Q_AppMainWindow::reloadWhisperConfig() {
 }
 
 void Q_AppMainWindow::onImportFile() {
-    QString fileName = QFileDialog::getOpenFileName(this, "Open Text", "", "Text Files (*.txt)");
+    QString fileName =
+        QFileDialog::getOpenFileName(this, "Import File", "",
+                                     "All Supported Files (*.txt *.wav *.mp3 *.m4a *.flac);;"
+                                     "Text Files (*.txt);;"
+                                     "Audio Files (*.wav *.mp3 *.m4a *.flac)");
     if (fileName.isEmpty()) {
         LOG_WARN("No file selected, skipping ...");
         return;
-    } else {
-        LOG_INFO("File selected: {}", fileName.toStdString());
     }
 
-    m_lblStatus->setText("Loading: " + fileName);
-    m_textContentProvider->load(fileName.toStdString(), [this](Session session) {
-        // A new session is created by the content provider
-        // passed to this lambda callback via value copy
-        // as the reference pass is not allowed in cross-thread async calls
-        // QMetaObject::invokeMethod is packing the lambda function to a task (QMetaCallEvent) and
-        // dispatch it to the main thread
-        QMetaObject::invokeMethod(this, [this, session = std::move(session)]() {
+    LOG_INFO("File selected: {}", fileName.toStdString());
+
+    auto onSessionReady = [this](Session session) {
+        QMetaObject::invokeMethod(this, [this, session = std::move(session)]() mutable {
+            if (session.sentences.empty()) {
+                m_lblStatus->setText("Import failed — no sentences found");
+                return;
+            }
             m_currentSession = std::move(session);
             m_currentSession.recordedSentences = std::vector<RecordedSentence>();
             for (const auto& sentence : m_currentSession.sentences) {
@@ -433,7 +437,18 @@ void Q_AppMainWindow::onImportFile() {
             updateContentList();
             LOG_INFO("Loaded {} sentences", m_currentSession.sentences.size());
         });
-    });
+    };
+
+    QString ext = QFileInfo(fileName).suffix().toLower();
+    if (ext == "txt") {
+        m_lblStatus->setText("Loading: " + fileName);
+        m_sessionPlaybackController->setContentProvider(m_textContentProvider.get());
+        m_textContentProvider->load(fileName.toStdString(), onSessionReady);
+    } else {
+        m_lblStatus->setText("Transcribing audio: " + QFileInfo(fileName).fileName() + " …");
+        m_sessionPlaybackController->setContentProvider(m_audioContentProvider.get());
+        m_audioContentProvider->load(fileName.toStdString(), onSessionReady);
+    }
 }
 
 void Q_AppMainWindow::updateContentList() {

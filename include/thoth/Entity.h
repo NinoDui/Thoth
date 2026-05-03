@@ -1,11 +1,18 @@
 #pragma once
 
+#include <QMetaType>
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "thoth/ISentenceScorer.h"
+
+struct TranscriptSegment {
+    std::string text;
+    double startMs = 0.0;
+    double endMs = 0.0;
+};
 
 struct TimeRange {
     double startMs = 0.0;
@@ -42,3 +49,5 @@ class Session {
 
     std::filesystem::path inputMediaPath;
 };
+
+Q_DECLARE_METATYPE(std::vector<TranscriptSegment>)

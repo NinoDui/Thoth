@@ -11,9 +11,15 @@ Q_ASRController::Q_ASRController(ISentenceScorer* scorer, const thoth::WhisperCo
     m_workerThread = new QThread(this);
     m_worker->moveToThread(m_workerThread);
 
+    qRegisterMetaType<std::vector<TranscriptSegment>>();
+
     connect(m_workerThread, &QThread::finished, m_worker, &QObject::deleteLater);
     connect(this, &Q_ASRController::sigTranscribe, m_worker, &Q_WhisperWorker::doTranscribe);
+    connect(this, &Q_ASRController::sigTranscribeFile, m_worker,
+            &Q_WhisperWorker::doTranscribeFile);
     connect(m_worker, &Q_WhisperWorker::transcriptReady, this, &Q_ASRController::onTranscriptReady);
+    connect(m_worker, &Q_WhisperWorker::transcriptSegmentsReady, this,
+            &Q_ASRController::transcriptSegmentsReady);
     connect(m_worker, &Q_WhisperWorker::busyChanged, this, &Q_ASRController::busyChanged);
     connect(m_worker, &Q_WhisperWorker::errorOccurred, this, &Q_ASRController::errorOccurred);
 
@@ -26,6 +32,10 @@ Q_ASRController::~Q_ASRController() {
 }
 
 void Q_ASRController::analyze(RecordedSentence* rs) { emit sigTranscribe(rs); }
+
+void Q_ASRController::transcribeFile(const QString& audioPath) {
+    emit sigTranscribeFile(audioPath);
+}
 
 void Q_ASRController::reloadModel(const thoth::WhisperConfig& config) {
     QMetaObject::invokeMethod(
