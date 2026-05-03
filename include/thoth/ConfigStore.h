@@ -61,6 +61,8 @@ class ConfigStore : public QObject {
 
     void load();
     void save();
+    std::filesystem::path getConfiguredPathNoLock(const std::string& key,
+                                                  const std::filesystem::path& fallback) const;
 
     std::filesystem::path m_configPath;
     std::filesystem::path getConfigDir() const;

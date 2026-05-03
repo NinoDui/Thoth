@@ -1,6 +1,8 @@
 # Target-3, Thoth Unit Tests
 add_executable(
     ThothTests
+    ConfigStoreTest.cpp
+    StreamAudioStorageTest.cpp
     WAVTest.cpp
     WERScorerTest.cpp
     TextParserTest.cpp

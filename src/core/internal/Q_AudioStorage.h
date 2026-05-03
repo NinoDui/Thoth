@@ -54,11 +54,13 @@ class AudioFileStreamSaver : public Q_AudioStreamConsumer {
     void abortSession() override;
 
    private:
+    void _resolveRootDir();
     void _drainBufferToFile();
     void _stop();
 
     LockFreeRingBuffer* m_dataSource = nullptr;
     std::filesystem::path m_rootDir;
+    bool m_hasExplicitRootDir = false;
 
     std::unique_ptr<QFile> m_file;
     QString m_sessionId;
