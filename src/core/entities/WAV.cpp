@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -161,11 +162,30 @@ WAV WAV::decode(const std::string& filename) {
 }
 
 WAV WAV::resample(const WAV& wav, uint32_t newSampleRate) {
-    // TODO: Implement resampling
-    if (wav.header.sampleRate == newSampleRate) {
-        return wav;
+    if (wav.header.sampleRate == newSampleRate) return wav;
+    if (!wav.floatData || wav.floatData->empty()) return WAV();
+
+    const double ratio = static_cast<double>(wav.header.sampleRate) / newSampleRate;
+    const size_t srcSize = wav.floatData->size();
+    const size_t dstSize = static_cast<size_t>(std::ceil(static_cast<double>(srcSize) / ratio));
+
+    WAV result;
+    result.floatData = std::vector<float>(dstSize);
+    for (size_t i = 0; i < dstSize; ++i) {
+        double srcPos = static_cast<double>(i) * ratio;
+        auto srcIdx = static_cast<size_t>(srcPos);
+        double frac = srcPos - static_cast<double>(srcIdx);
+        float s0 = (*wav.floatData)[srcIdx];
+        float s1 = (srcIdx + 1 < srcSize) ? (*wav.floatData)[srcIdx + 1] : s0;
+        (*result.floatData)[i] = static_cast<float>(s0 * (1.0 - frac) + s1 * frac);
     }
-    return WAV();
+
+    result.header = wav.header;
+    result.header.sampleRate = newSampleRate;
+    result.header.byteRate = newSampleRate * wav.header.blockAlign;
+    LOG_INFO("Resampled audio from {}Hz to {}Hz ({} -> {} samples)", wav.header.sampleRate,
+             newSampleRate, srcSize, dstSize);
+    return result;
 }
 
 std::ostream& operator<<(std::ostream& os, const WAV& wav) {

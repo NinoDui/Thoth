@@ -1,8 +1,8 @@
 # Project Development Document: Thoth
 
-**Version**: 0.2.0
+**Version**: 0.4.0
 **Last Updated**: 2026-05-03
-**Status**: Active Development (MVP Phase, text-input shadowing path complete)
+**Status**: Active Development (P0+P1 complete — audio import path functional, WAV range playback live)
 
 ---
 
@@ -20,7 +20,10 @@ A configurable, local-first shadowing practice tool that supports multiple langu
 - **Provider abstraction**: TTS engines are swapped behind `thoth::ITTSEngine`; scoring is swapped behind `ISentenceScorer`.
 - **Live-reload configuration**: settings changes are applied without restart (TTS engine, voice, Whisper model, proxy).
 - **Lock-free audio capture pipeline**: 16 kHz capture → SPSC ring buffer → IO-thread WAV writer, no mutex on the audio hot path.
-- **Industrial-grade C++20**: RAII, smart pointers, dispatch via Qt signals + queued connections, Google-style code conventions, pre-commit + clang-format enforcement.
+- **Industrial-grade C++20**: RAII, smart pointers, dispatch via Qt signals + queued connections, Google-style code conventions, pre-commit + clang-format + clang-tidy + cppcheck enforcement.
+- **Multi-mode shadowing**: Normal, pause-and-repeat, and simultaneous shadowing modes with configurable playback speed (0.5x–2.0x).
+- **Word-level scoring feedback**: Levenshtein DP back-trace produces per-token Correct/Missing/Different labels rendered as colored rich text in the sentence list.
+- **Dual input modes**: text import (`.txt` + paste) with TTS audio, or audio import (`.wav`) with Whisper transcription and source-audio range playback — same shadowing UI for both.
 
 ---
 
@@ -39,6 +42,7 @@ A configurable, local-first shadowing practice tool that supports multiple langu
 | Local TTS | Piper | – | Engine adapter present; synthesis not yet implemented |
 | Testing | GoogleTest + GMock + QSignalSpy | latest | Unit & integration tests |
 | Code Style | clang-format, cmake-format, pre-commit | – | Style enforcement |
+| Static Analysis | clang-tidy, cppcheck, cpplint, shellcheck | – | Code quality enforcement (pre-commit hooks) |
 
 ### 2.1 Compiler Requirements
 
@@ -104,8 +108,9 @@ Main Thread (GUI)
   │     └── QTimer (30 ms) drains LockFreeRingBuffer → QFile (WAV)
   │
   ├── Whisper Worker Thread     ◄── owns Q_WhisperWorker (whisper_context*)
-  │     └── slot doTranscribe(RecordedSentence*)
-  │           WAV::decode → whisper_full → emit transcriptReady
+  │     ├── slot doTranscribe(RecordedSentence*)       → scoring path
+  │     ├── slot doTranscribeFile(QString)             → source-audio import path
+  │     └── WAV::decode → whisper_full → emit transcriptReady / transcriptSegmentsReady
   │
   └── QtConcurrent thread pool  ◄── short-lived TTS download tasks
         └── ITTSEngine::synthesize() → QFutureWatcher::finished (main thread)
@@ -126,8 +131,9 @@ Main Thread (GUI)
 |--------|-----------|---------|
 | `Entity.h` | `Sentence`, `RecordedSentence`, `Session`, `TimeRange` | Domain entities |
 | `ITTSEngine.h` | `thoth::ITTSEngine`, `thoth::TTSAudioResult` | TTS provider interface (`synthesize`, `engineName`, `isAvailable`) |
-| `ISentenceScorer.h` | `ISentenceScorer` | Scoring interface returning `[0.0, 1.0]` |
-| `ContentProvider.h` | `IContentProvider`, `TextContentProvider` | Content loading + per-sentence audio preparation |
+| `ISentenceScorer.h` | `ISentenceScorer`, `TokenLabel`, `TokenResult`, `ScoringResult` | Scoring interface: `score()` returns `[0.0, 1.0]`, `scoreDetail()` returns per-token alignment (Correct/Missing/Different) + extra tokens |
+| `ContentProvider.h` | `IContentProvider`, `TextContentProvider` | Content loading (`load`, `loadFromText`) + per-sentence audio preparation |
+| `AudioContentProvider.h` | `AudioContentProvider : QObject, IContentProvider` | Audio import: dispatches source-audio to Whisper via `Q_ASRController`, builds `Session` from timestamped transcript segments, `prepareAudio()` validates source file (no TTS) |
 | `ConfigStore.h` | `ConfigStore` (Qt singleton) | Runtime config, paths, typed getters; emits `configChanged(QString)` |
 | `ConfigKey.h` | `thoth::config::KEY_*` and `DEFAULT_*` constants | Compile-time config keys and defaults |
 | `ThothConfig.h` | `AudioRecorderConfig`, `WhisperConfig`, `GoogleTTSConfig`, `LogConfig` | Typed POD config structs |
@@ -136,7 +142,7 @@ Main Thread (GUI)
 | `Q_RecordController.h` | `Q_RecordController` | Recording lifecycle (capture → ring buffer → IO worker) |
 | `Q_SessionPlaybackController.h` | `Q_SessionPlaybackController` | Sentence-by-sentence playback orchestration |
 | `Q_AudioPlayer.h` | `Q_AudioPlayer` | Pure-functional `QMediaPlayer` + `QAudioOutput` wrapper |
-| `WERScorer.h` | `WERScorer : ISentenceScorer` | WER-based scoring (Levenshtein on normalized tokens) |
+| `WERScorer.h` | `WERScorer : ISentenceScorer` | WER-based scoring with Levenshtein DP back-trace for per-token alignment |
 | `TTSEngineFactory.h` | `thoth::CreateTTSEngine()` | Factory; selects Piper if requested + available, otherwise GCP |
 | `AuthProviderFactory.h` | `AuthChain`, `AuthCallbacks`, `AuthProviderFactory` | Chain-of-responsibility GCP auth |
 
@@ -155,10 +161,10 @@ Main Thread (GUI)
 
 | Controller | Responsibility |
 |------------|---------------|
-| `Q_SessionPlaybackController` | Sentence playback loop: `play / playSentence / playNext / playPrevious / pause / resume / stop`. Single-sentence loop with configurable inter-loop delay (`QTimer`). Prefetches next 3 sentences via `IContentProvider::prepareAudio` with no-op callback. `suspendAutoAdvance()` lets external callers (e.g., user-audio playback) borrow `Q_AudioPlayer` without triggering `playNext()` on EndOfMedia. |
+| `Q_SessionPlaybackController` | Sentence playback loop. For text/TTS sentences: calls `IContentProvider::prepareAudio` → `Q_AudioPlayer::play(path)`. For audio-import sentences with `audioRange`: calls `play(path, startMs, endMs)`. Prefetches next 3 sentences. `suspendAutoAdvance()`, shadowing modes, `repeatRequested` signal for pause-and-repeat. |
 | `Q_RecordController` | Owns `Q_AudioCaptureProducer` + `LockFreeRingBuffer` + `AudioFileStreamSaver` (latter moved to dedicated `QThread`). Forwards mic data into ring buffer; emits `updateAmplitude(float)` for the visualizer; emits `recordingFinished(path)` on session finalize. Has a public DI constructor used by `TestRecordController`. |
-| `Q_ASRController` | Owns `Q_WhisperWorker` on dedicated `QThread`. `analyze(RecordedSentence*)` dispatches via `sigTranscribe` (queued). On `transcriptReady`, computes `m_scorer->score(reference, hypothesis)`, writes back into `RecordedSentence::shadowingScore` (0.0–1.0), emits `analysisReady`. |
-| `Q_WhisperWorker` (internal) | Lazy-loads whisper model on first transcription (`whisper_init_from_file_with_params`). Decodes recorded WAV → float PCM via `WAV::decode`, runs `whisper_full` greedy, concatenates segment text, trims leading space. `reloadModel()` frees the context so the next transcribe re-initializes. Emits `busyChanged(bool)` for UI gating. |
+| `Q_ASRController` | Owns `Q_WhisperWorker` on dedicated `QThread`. `analyze(RecordedSentence*)` dispatches scoring path via `sigTranscribe`; `transcribeFile(path)` dispatches source-audio path via `sigTranscribeFile`. On `transcriptReady`, calls `m_scorer->scoreDetail(reference, hypothesis)`, stores `ScoringResult` in `RecordedSentence::scoringDetail`, emits `analysisReady`. On `transcriptSegmentsReady`, emits timestamped `TranscriptSegment` list for `AudioContentProvider`. |
+| `Q_WhisperWorker` (internal) | Lazy-loads whisper model on first transcription. **Scoring path** (`doTranscribe`): decodes recorded WAV → float PCM, runs `whisper_full` greedy, concatenates segment text. **Source-audio path** (`doTranscribeFile`): decodes source WAV (resamples to 16 kHz if needed), sets `print_timestamps = true`, emits `TranscriptSegment` list. `reloadModel()` frees the context for lazy reinit. Emits `busyChanged(bool)` for UI gating. |
 
 #### 4.2.3 `services/`
 
@@ -169,26 +175,27 @@ Main Thread (GUI)
 | `PiperTTSEngine.cpp` | Local Piper adapter. `isAvailable()` returns `true` if the model file exists, but `synthesize()` is a logged warning that returns an empty result — full Piper integration is deferred. |
 | `TTSEngineFactory.cpp` | `CreateTTSEngine(engineName, gcpConfigPath, piperModelPath)`. If `engineName == "piper"` and the engine reports available, returns Piper; otherwise constructs `GCPTTSEngine` from `ConfigStore::getGoogleTTSConfig()`. The `gcpConfigPath` parameter is currently unused (call site passes `""`). |
 | `Q_GCPTTSDownloader.cpp` (class `Q_TTSDownloader`) | Wraps any `ITTSEngine` for async dispatch via `QtConcurrent::run` + `QFutureWatcher`. Callback receives `(success, QByteArray, errorMsg)` on the main thread. |
-| `TextContentProvider.cpp` | Implements `IContentProvider`: parses `.txt` via `TextParser`, builds `Session` with `Sentence` entries, then `prepareAudio()` checks `AudioCache`, deduplicates via `m_downloadingIdx`, and dispatches via `Q_TTSDownloader`. On success, writes file to cache (MD5-named) and stores path in `Sentence::localAudioPath`. |
+| `TextContentProvider.cpp` | Implements `IContentProvider`: parses `.txt` via `TextParser`, parses pasted text via `TextParser::parseText()`, builds `Session` with `Sentence` entries, then `prepareAudio()` checks `AudioCache`, deduplicates via `m_downloadingIdx`, and dispatches via `Q_TTSDownloader`. On success, writes file to cache (MD5-named) and stores path in `Sentence::localAudioPath`. |
 | `AudioCache.cpp` | Per-sentence audio cache. Filename derived from **MD5** hex of the sentence text + `.mp3` extension. `get(sentence)` returns the cached path if the file exists and is non-empty. `saveAudio(idx, sentence, data)` writes via `QFile` and tracks `idx → path` map. |
 | `AudioCapture.cpp` (`Q_AudioCaptureProducer`) | Wraps `QAudioSource` over the default input device. Negotiates format with the device; falls back to `defaultDevice.preferredFormat()` if the requested 16 kHz / mono / Int16 is not supported. Logs the negotiated format. Emits `audioDataAvailable(QByteArray)` on every `readyRead`. |
 | `StreamAudioStorage.cpp` (`AudioFileStreamSaver`) | Drains `LockFreeRingBuffer` into a `QFile` every 30 ms. Writes a 44-byte placeholder header on `startSession`, accumulates `m_totalBytes`, and back-writes the real `WAVHeader` on `finalizeSession`. Default root is `<cacheDir>/record/`; session file is `<sessionId>.wav`. |
-| `Q_AudioPlayer.cpp` | Thin `QMediaPlayer` + `QAudioOutput` wrapper (path → playback). Translates `QMediaPlayer::MediaStatus` and error events into typed signals (`started / paused / resumed / stopped / finished / errorOccurred`). |
+| `Q_AudioPlayer.cpp` | Thin `QMediaPlayer` + `QAudioOutput` wrapper. `play(path)` for full playback; `play(path, startMs, endMs)` for range playback (seeks on `LoadedMedia`, auto-stops via `QTimer` at `endMs`, emits `finished()`). Exposes `setRate(qreal)` / `rate()` for playback speed control. |
+| `AudioContentProvider.cpp` | Implements `IContentProvider`: `load(audioPath)` dispatches to `Q_ASRController::transcribeFile()`, `onTranscriptSegmentsReady` builds `Session` with timestamped `Sentence` entries (merging/splitting Whisper segments). `prepareAudio()` validates source file exists and `audioRange` is set — never calls TTS. `loadFromText()` is a no-op. |
 
 #### 4.2.4 `entities/`
 
 | Entity | Purpose |
 |--------|---------|
-| `WAV.cpp` | `WAVHeader::create / read / isValid`, `WAV::decode` (file or stream). Validates header (PCM only, channels ≥ 1, dataSize % blockAlign == 0). Decodes 8/16/32-bit PCM into normalized float samples (mono-mixdown). `WAV::resample` is a stub. |
+| `WAV.cpp` | `WAVHeader::create / read / isValid`, `WAV::decode` (file or stream). Validates header (PCM only, channels ≥ 1, dataSize % blockAlign == 0). Decodes 8/16/32-bit PCM into normalized float samples (mono-mixdown). `WAV::resample` implemented (linear interpolation to target sample rate). |
 
 #### 4.2.5 `utils/`
 
 | Utility | Purpose |
 |---------|---------|
 | `Segmenters.cpp` (`RegexSegmenter`) | Splits on `[.?!\n]\s+|$`. Filters out all-digit and all-punctuation tokens. English-tuned. |
-| `TextParser.cpp` | Composes `FileExtractor` + `Segmenter` for the `path → sentences` pipeline. PIMPL-style. |
+| `TextParser.cpp` | Composes `FileExtractor` + `Segmenter` for the `path → sentences` pipeline. Also provides `parseText(std::string_view)` for in-memory text (used by text-box input). PIMPL-style. |
 | `FileExtractors.cpp` | `TxtExtractor` (read full file). `PdfExtractor` is a stub. Factory by extension or format string. |
-| `WERScorer.cpp` | Lowercase + replace punctuation with spaces, tokenize on whitespace, Levenshtein on token vectors. Returns `max(0, 1 - min(1, WER))`. Empty reference + empty hypothesis → 1.0; empty reference + non-empty hypothesis → 0.0. |
+| `WERScorer.cpp` | Lowercase + replace punctuation with spaces, tokenize on whitespace, Levenshtein on token vectors. `score()` returns `max(0, 1 - min(1, WER))`. `scoreDetail()` additionally back-traces the DP table via `alignTokens()` to produce per-token Correct / Missing / Different labels and a list of extra hypothesis tokens. |
 | `AudioTools.cpp` | `QAudioSampleFormatToBits()` — Qt `QAudioFormat::SampleFormat` → bit depth. |
 | `Timer.cpp` | `getCurrentTimestamp()` formatted via `std::format` for session and temp-dir naming. |
 
@@ -216,10 +223,10 @@ Main Thread (GUI)
 |------|---------|
 | `main.cpp` | Constructs `AppRunner` and calls `run()` — that's the entire entry point. |
 | `AppRunner.{h,cpp}` | Bootstrap order: `ConfigStore::init()` → `LogManager::Guard` → `QApplication` → `StyleLoader::attach()` → `setupNetwork()` (proxy env vars) → `authenticate()` (chain prompts for GCP credential) → `Q_AppMainWindow::show()` → `app->exec()`. Top-level try/catch around `run()` translates uncaught exceptions to `QMessageBox::critical`. |
-| `ui/Q_AppMainWindow.{h,cpp}` | Main window: menu bar (`Import File`, `Settings`, `Exit`), centered status label, `QListWidget` of sentences (with bold-highlight of currently-playing item and `[score%]` badge after analysis), `Q_PlaybackControlBar`, `Q_ShadowingBar`. Constructs all controllers in `setupControllers()`. Wires UI signals to controllers in `setup{Playback,Recording,ASR}Connections()`. Reacts to `ConfigStore::configChanged` by re-creating the TTS engine (and rebinding playback connections) or reloading the Whisper model in place. |
-| `ui/Q_SettingDialog.{h,cpp}` | Tabbed dialog (`General` / `Network` / `About`). General tab: cache dir, log dir, TTS engine combo (`gcp` / `piper`), GCP credential file picker, language combo (`en-US`, `zh-CN`, `ja-JP`), voice combo (editable), Piper model path, Whisper model path, read-only display of the config file location. Network tab: proxy string. Save writes through `ConfigStore::setValue` and pushes proxy env vars immediately. |
-| `ui/Q_ShadowingBar.{h,cpp}` | Record/Stop toggle button, "Play user audio" button, RMS visualizer (`QProgressBar`), analyzing/result labels. Emits `sigStartRecording / sigStopRecording / sigPlayUserAudio`. Slots for `setAmplitude`, `onRecordingFinished`, `onASRAnalysisBusy`, `onASRAnalysisReady(scorePercent)`. |
-| `ui/Q_PlaybackControlBar.{h,cpp}` | Prev / Play-Pause / Next buttons, single-sentence loop checkbox, inter-loop delay spinbox. |
+| `ui/Q_AppMainWindow.{h,cpp}` | Main window: menu bar (`Import File` accepts `*.txt *.wav *.mp3 *.m4a *.flac`), text-box input (`QPlainTextEdit` + "Load Text"), `QListWidget` (word-level colored diff via `HtmlDelegate`), `Q_PlaybackControlBar`, `Q_ShadowingBar`. `onImportFile` dispatches `.txt` → `TextContentProvider`, audio files → `AudioContentProvider`. Constructs both content providers and all controllers in `setupControllers()`. |
+| `ui/Q_SettingDialog.{h,cpp}` | Tabbed dialog (`General` / `Network` / `About`). General tab: cache dir, log dir, TTS engine combo (`gcp` / `piper`), GCP credential file picker, language combo (`en-US`, `sv-SE`, `zh-CN`, `ja-JP`, `ko-KR`) with auto-mapped default voice, voice combo (editable), Piper model path, Whisper model path + language combo. Network tab: proxy string. Save writes through `ConfigStore::setValue` and pushes proxy env vars immediately. |
+| `ui/Q_ShadowingBar.{h,cpp}` | Record/Stop toggle button, "Play user audio" button, RMS visualizer (`QProgressBar`), analyzing/result labels. Emits `sigStartRecording / sigStopRecording / sigPlayUserAudio`. Slots for `setAmplitude`, `onRecordingFinished`, `onASRAnalysisBusy`, `onASRAnalysisReady(scorePercent)`. `triggerRecording()` public method for programmatic recording start (used by pause-and-repeat mode). |
+| `ui/Q_PlaybackControlBar.{h,cpp}` | Prev / Play-Pause / Next buttons, single-sentence loop checkbox, inter-loop delay spinbox, speed slider (0.5x–2.0x), shadowing mode combo (`Normal` / `Pause-and-Repeat` / `Simultaneous`). |
 | `ui/StyleLoader.h` | Stylesheet loader. |
 
 ### 4.4 Data Flow: Text-Input Shadowing
@@ -309,7 +316,9 @@ Thread-safe Qt singleton at `~/.config/Thoth/config.json`.
 | Audio | `audio/recorder_buffer_size` | `1024` | bytes (advisory) |
 | Audio | `audio/recorder_rms_step` | `8` | sample stride for RMS visualizer |
 | Whisper | `whisper/model_path` | `models/ggml-base.en.bin` | Loaded lazily on first transcription |
-| Whisper | `whisper/model_language` | `en` | Whisper language tag |
+| Whisper | `whisper/model_language` | `en` | Whisper language tag (`en`, `sv`, `zh`, `ja`, `ko`) |
+| Playback | `playback/rate` | `1.0` | Playback speed (0.5–2.0) |
+| Playback | `playback/mode` | `normal` | Shadowing mode (`normal`, `pause-and-repeat`, `simultaneous`) |
 | Log | `log/level` | `debug` | console minimum (file sink is always `debug`) |
 | Log | `log/pattern` | `[%Y-%m-%d %H:%M:%S.%e][%t][%^%l%$] %s:%# %! %v` | spdlog pattern |
 | Log | `log/to_console`, `log/to_file` | `true`, `true` | sink toggles |
@@ -321,6 +330,8 @@ Thread-safe Qt singleton at `~/.config/Thoth/config.json`.
 - `tts/*` (engine, voice, language, encoding, piper model path) → recreate `ITTSEngine`, recreate `TextContentProvider`, recreate `Q_SessionPlaybackController` with the existing `Q_AudioPlayer`, rebind playback connections, restore the active session.
 - `whisper/model_path`, `whisper/model_language` → `Q_ASRController::reloadModel(...)` which queues `Q_WhisperWorker::reloadModel` on the worker thread (frees `whisper_context*`; next `doTranscribe` reloads).
 - `network/proxy` → re-export proxy env vars in-process.
+- `playback/rate` → applies `Q_AudioPlayer::setRate()` immediately.
+- `playback/mode` → stored in config; applied on next `restorePlaybackSettings()` / mode change via UI.
 
 ---
 
@@ -387,8 +398,10 @@ cmake --build build/debug --target RunThothTest
 
 | PRD | Feature | Status |
 |-----|---------|--------|
+| FR-001 | Text-box input | ✅ `QPlainTextEdit` + `loadFromText()` in-memory ingest |
 | FR-002 | TXT file import | ✅ |
-| FR-008 | Text segmentation | ✅ `RegexSegmenter` (English-tuned) |
+| FR-005 | Multi-language (en, sv, zh, ja, ko) | ✅ Config + UI + language→voice mapping |
+| FR-008 | Text segmentation | ✅ `RegexSegmenter` (`.?!\n` covers en/sv) |
 | FR-012 | Google TTS | ✅ via google-cloud-cpp |
 | FR-013 | Local + online TTS | ⚠️ GCP works; Piper adapter present but synthesis stub |
 | FR-014 | Sentence-level TTS | ✅ |
@@ -397,20 +410,29 @@ cmake --build build/debug --target RunThothTest
 | FR-022 | Full playback (sentence-by-sentence) | ✅ |
 | FR-023 | Single-sentence playback | ✅ |
 | FR-024 | Interval playback | ✅ Configurable inter-loop delay |
-| FR-025 | Playback controls | ✅ Play / Pause / Prev / Next / Loop / Delay (no speed control) |
+| FR-025 | Playback controls + speed | ✅ Play/Pause/Prev/Next/Loop/Delay + speed slider 0.5x–2.0x |
 | FR-027 | User recording | ✅ via `QAudioSource` |
 | FR-028 | Sentence-level recording | ✅ |
 | FR-029 | Recording storage | ✅ WAV files in `<cacheDir>/record/` |
 | FR-030 | Manual stop | ✅ |
-| FR-033 | Pronunciation scoring | ✅ WER-based (0–100% in UI badge) |
-| FR-034 | Whisper.cpp integration | ✅ Local STT for scoring |
+| FR-031 | Pause-and-repeat mode | ✅ Mode combo + `repeatRequested` signal + auto-record trigger |
+| FR-032 | Simultaneous shadowing mode | ✅ Recording allowed while playback active |
+| FR-033 | Pronunciation scoring | ✅ WER-based (0–100%); `scoreDetail()` returns per-token labels |
+| FR-034 | Whisper.cpp integration | ✅ Local STT for scoring path |
+| FR-036 | Word-level difference highlighting | ✅ `HtmlDelegate` renders colored tokens (Correct/Missing/Different) + extra tokens |
+| FR-003 | Audio file import (WAV) | ✅ `AudioContentProvider` + `onImportFile` routing; WAV decode via existing `WAV::decode` |
+| FR-009 | Audio transcription | ✅ `Q_WhisperWorker::doTranscribeFile` path with timestamp extraction |
+| FR-017 | Whisper.cpp as STT for source audio | ✅ `transcribeFile` path alongside scoring path |
+| FR-018 | Whisper.cpp integration (dual path) | ✅ Scoring + source-audio transcription paths |
+| FR-020 | Timestamp extraction | ✅ `wparams.print_timestamps = true` in source-audio path |
+| FR-021 | Audio-text alignment | ✅ Whisper segments merged/split into `Sentence` with `audioRange`; range playback via `Q_AudioPlayer::play(path, startMs, endMs)` |
 | NFR-006 | Async / non-blocking GUI | ✅ QtConcurrent for TTS, `QThread` workers for IO and Whisper |
 | NFR-007 | Error handling | ✅ Exceptions + Qt error signals + `QMessageBox` for playback errors |
 | NFR-010 | Modular architecture | ✅ 15 public headers, internal/services/controllers/utils split |
 | NFR-011 | Provider abstraction | ✅ `ITTSEngine`, `ISentenceScorer`, `IContentProvider`, `IAudioCaptureService`, `IStreamStorage` |
 | NFR-012 | Config-based design | ✅ JSON `ConfigStore` |
 | NFR-013 | Project structure | ✅ separate `src/core`, `src/app`, `test`, `docs`, `models`, `third_party`, `cmake` |
-| NFR-014 | Unit tests | ✅ 5 active test files |
+| NFR-014 | Unit tests | ✅ 7 active test files (27 tests) |
 | NFR-016 | API key handling | ✅ env var + auth chain + config-stored path |
 | NFR-017 | Local data privacy | ✅ recordings, transcripts, sessions are all local |
 
@@ -418,29 +440,17 @@ cmake --build build/debug --target RunThothTest
 
 | PRD | Feature | Status / Note |
 |-----|---------|--------------|
-| FR-001 | Text-box input | ❌ Only file import via menu |
-| FR-003 | Audio file import | ❌ `IContentProvider` only has `TextContentProvider` |
-| FR-005 | Multi-language | ⚠️ Config + UI offer `en-US`, `zh-CN`, `ja-JP`; segmentation rules are English-tuned |
+| FR-003 | Audio file import (non-WAV) | ⚠️ WAV works; MP3/M4A/FLAC returns clear error (QAudioDecoder path pending) |
 | FR-007 | Language detection | ❌ |
-| FR-018 | Whisper.cpp as primary STT | ✅ for scoring path; not yet for source-audio transcription |
-| FR-020/021 | Timestamp extraction + audio-text alignment | ❌ Whisper params currently disable timestamps |
-| FR-031 | Pause-and-record mode | ❌ |
-| FR-032 | Simultaneous shadowing mode | ⚠️ Possible by user discipline; no explicit mode |
-| FR-036 | Word-level difference highlighting | ⚠️ Score badge only; no per-word marking yet |
 | FR-038 | Session summary | ❌ |
-| FR-029 | Session persistence across restarts | ❌ Sessions live in memory only |
-| GUI-003 | Settings panel — playback speed | ❌ Not exposed |
-| GUI-003 | Settings panel — sentence interval duration | ✅ Inter-loop delay spinbox in playback bar (not in Settings dialog) |
+| NFR-009 | Session persistence across restarts | ❌ Sessions live in memory only |
 
 ### 8.3 Not Started
 
 | Feature | Priority |
 |---------|----------|
 | Audio file import → STT → segmentation → time-aligned playback | High (FR-003, FR-021) |
-| Swedish language support (config + segmentation) | High (FR-005) |
-| Word-level diff highlighting in sentence list | High (FR-036) |
 | Session persistence / recovery | Medium (NFR-009) |
-| Playback speed control | Medium |
 | Session summary view | Medium (FR-038) |
 | Piper synthesis implementation | Medium |
 | WAV resampling (`WAV::resample` is a stub) | Medium |
@@ -481,17 +491,14 @@ cmake --build build/debug --target RunThothTest
 
 ## 10. Known Limitations
 
-1. **Audio import not wired** — only `.txt` ingest is implemented; no `.mp3 / .wav / .m4a / .flac` reader.
+1. **Non-WAV audio import pending** — `.wav` works via `WAV::decode`; `.mp3 /.m4a /.flac` return a clear error (Qt `QAudioDecoder` path not yet implemented).
 2. **Single Whisper context** — model switch requires `reloadModel()` (free + lazy reinit on next transcribe).
-3. **`WAV::resample` is a stub** — input must already match the recorded WAV's sample rate; recording defaults to 16 kHz which Whisper expects.
-4. **No session persistence** — close = lose. Recordings remain on disk under `<cacheDir>/record/` but aren't reattached.
-5. **Segmenter is English-tuned** — `RegexSegmenter` splits on `.?!\n`; CJK punctuation is not handled.
-6. **No JP/KR token-level scoring** — WER tokenizes on whitespace, which is wrong for Japanese/Korean. (Low priority per current scope.)
-7. **Piper not functional** — `synthesize()` returns empty even when `isAvailable()` is true.
-8. **GCP is the de-facto TTS** — without a working Piper, network is required for new sentences (cached audio still plays offline).
-9. **No silence-detection auto-stop** — recording runs until the user clicks Stop. (Low priority per current scope.)
-10. **No playback speed UI**.
-11. **Settings dialog does not expose Whisper language** (only the model path), even though `KEY_WHISPER_MODEL_LANGUAGE` is read by the engine.
+3. **No session persistence** — close = lose. Recordings remain on disk under `<cacheDir>/record/` but aren't reattached.
+4. **Segmenter is English/Swedish-tuned** — `RegexSegmenter` splits on `.?!\n`; CJK punctuation is not handled.
+5. **No JP/KR token-level scoring** — WER tokenizes on whitespace, which is wrong for Japanese/Korean. (Low priority per current scope.)
+6. **Piper not functional** — `synthesize()` returns empty even when `isAvailable()` is true.
+7. **GCP is the de-facto TTS** — without a working Piper, network is required for new sentences (cached audio still plays offline).
+8. **No silence-detection auto-stop** — recording runs until the user clicks Stop. (Low priority per current scope.)
 
 ---
 
@@ -519,9 +526,11 @@ cmake --build build/debug --target RunThothTest
 
 ### 11.3 Style Enforcement
 
-- `.clang-format` (Google-based)
+- `.clang-format` (Google-based, 100 col, 4-space indent)
+- `.clang-tidy` (C++20/Qt6-tuned, bugprone/performance/readability/modernize/cppcoreguidelines checks)
 - `.cmake-format.yaml`
-- `.pre-commit-config.yaml` runs clang-format + cmake-format on every commit
+- `.pre-commit-config.yaml` runs clang-format + cmake-format + shellcheck on every commit; clang-tidy + cppcheck + cpplint available as manual-stage hooks
+- `CPPLINT.cfg` for Google-style cpplint (manual use)
 - `thoth_set_warning()` helper applies `-Wall -Wextra -pedantic` (or `/W4`)
 
 ### 11.4 Documentation
@@ -557,7 +566,8 @@ cmake --build build/debug --target RunThothTest
 Thoth/
 ├── cmake/
 │   └── ThothVcpkgToolchain.cmake         # Triplet selection wrapper
-├── include/thoth/                        # Public API (15 headers)
+├── include/thoth/                        # Public API (16 headers)
+│   ├── AudioContentProvider.h
 │   ├── Entity.h
 │   ├── ITTSEngine.h
 │   ├── ISentenceScorer.h
@@ -582,6 +592,7 @@ Thoth/
 │   │       ├── Q_SettingDialog.{h,cpp}
 │   │       ├── Q_ShadowingBar.{h,cpp}
 │   │       ├── Q_PlaybackControlBar.{h,cpp}
+│   │       ├── HtmlDelegate.h
 │   │       └── StyleLoader.h
 │   └── core/
 │       ├── common/         # ConfigStore, Logger, Auth, LockFreeRingBuffer
@@ -590,10 +601,10 @@ Thoth/
 │       ├── entities/       # WAV
 │       ├── internal/       # 13 internal headers
 │       ├── services/       # TTS, downloader, audio capture, storage,
-│       │                   # content provider, audio cache, audio player
+│       │                   # content provider (Text + Audio), audio cache, audio player
 │       └── utils/          # Segmenters, TextParser, FileExtractors,
 │                           # WERScorer, AudioTools, Timer
-├── test/                   # 5 GoogleTest files + test_main.cpp
+├── test/                   # 7 GoogleTest files + test_main.cpp (27 tests)
 │   └── resources/
 ├── docs/
 │   ├── PRD.md
@@ -608,8 +619,10 @@ Thoth/
 ├── CMakePresets.json       # debug, release
 ├── vcpkg.json              # nlohmann-json, spdlog, google-cloud-cpp, gtest
 ├── .clang-format
+├── .clang-tidy
 ├── .cmake-format.yaml
 ├── .pre-commit-config.yaml
+├── CPPLINT.cfg
 └── README.md
 ```
 
@@ -657,25 +670,34 @@ Thoth/
 
 ## 15. Future Roadmap
 
-### Phase 2 — Audio Import & Multi-Language (current)
+### Phase 1 — MVP Completion ✅ COMPLETE
 
-- [ ] Audio file import (`.mp3`, `.wav`, `.m4a`, `.flac`)
-- [ ] Source-audio Whisper transcription with timestamp extraction (`print_timestamps = true`)
-- [ ] Audio-text alignment for sentence-level reference playback (FR-021)
-- [ ] Swedish language support (config + segmentation rules)
-- [ ] Settings dialog: expose Whisper language; add playback speed control
+- [x] Text-box input (FR-001)
+- [x] Swedish language support (config + segmentation rules)
+- [x] Word-level diff highlighting in sentence list (correct / missing / different)
+- [x] Pause-and-repeat mode (auto-pause after reference; user records)
+- [x] Simultaneous shadowing mode (record while playback active)
+- [x] Playback speed control (0.5x–2.0x slider)
+- [x] Settings dialog: Whisper language combo + playback speed + mode persistence
+
+### Phase 2 — Audio Import (current, mostly complete)
+
+- [x] Audio file import — `.wav` via `WAV::decode` + `AudioContentProvider`
+- [x] Source-audio Whisper transcription with timestamp extraction
+- [x] Audio-text alignment (Whisper segments → `Sentence::audioRange`)
+- [x] Range playback (`Q_AudioPlayer::play(path, startMs, endMs)`)
+- [x] WAV resampling (linear interpolation in `WAV::resample`)
+- [ ] Non-WAV decode (MP3/M4A/FLAC via `QAudioDecoder`)
+- [ ] Language detection (FR-007)
 
 ### Phase 3 — Practice Modes & Feedback
 
-- [ ] Pause-and-record mode (auto-pause after reference; user records, then auto-resume)
-- [ ] Word-level diff highlighting in sentence list (correct / missing / extra / different)
 - [ ] Session summary panel (avg score, weak words, duration)
 - [ ] Session persistence (JSON serialization or SQLite)
 
 ### Phase 4 — Polish
 
 - [ ] Piper TTS full implementation + voice model browser
-- [ ] WAV resampling implementation (currently stub)
 - [ ] Real-time waveform visualization (replace RMS bar)
 - [ ] Doxygen-rendered API site (CI-published)
 - [ ] Metal / Core ML acceleration for Whisper on macOS

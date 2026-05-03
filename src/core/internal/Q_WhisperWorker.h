@@ -16,10 +16,12 @@ class Q_WhisperWorker : public QObject {
 
    public slots:
     void doTranscribe(RecordedSentence* rs);
+    void doTranscribeFile(const QString& audioPath);
     void reloadModel(const thoth::WhisperConfig& config);
 
    signals:
     void transcriptReady(RecordedSentence* rs);
+    void transcriptSegmentsReady(std::vector<TranscriptSegment> segments);
     void busyChanged(bool busy);
     void errorOccurred(const QString& message);
 

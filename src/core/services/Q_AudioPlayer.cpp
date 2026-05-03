@@ -1,10 +1,17 @@
 #include "thoth/Q_AudioPlayer.h"
 
+#include <algorithm>
+
 #include "thoth/Logger.h"
 
 Q_AudioPlayer::Q_AudioPlayer(QObject* parent)
-    : QObject(parent), m_player(new QMediaPlayer(this)), m_audioOutput(new QAudioOutput(this)) {
+    : QObject(parent),
+      m_player(new QMediaPlayer(this)),
+      m_audioOutput(new QAudioOutput(this)),
+      m_rangeTimer(new QTimer(this)) {
     m_player->setAudioOutput(m_audioOutput.get());
+    m_rangeTimer->setSingleShot(true);
+    connect(m_rangeTimer, &QTimer::timeout, this, &Q_AudioPlayer::_onRangeTimerTimeout);
     _setupConnections();
 }
 
@@ -25,9 +32,22 @@ QString Q_AudioPlayer::toQString(const std::filesystem::path& path) {
 }
 
 void Q_AudioPlayer::play(const std::filesystem::path& audioPath) {
+    m_rangeTimer->stop();
+    m_rangeStartMs = -1.0;
+    m_rangeEndMs = -1.0;
     m_player->stop();
     m_player->setSource(QUrl::fromLocalFile(toQString(audioPath)));
     m_player->play();
+    emit started();
+}
+
+void Q_AudioPlayer::play(const std::filesystem::path& audioPath, double startMs, double endMs) {
+    m_rangeTimer->stop();
+    m_rangeStartMs = startMs;
+    m_rangeEndMs = endMs;
+    m_player->stop();
+    m_player->setSource(QUrl::fromLocalFile(toQString(audioPath)));
+    // Actual play() + seek deferred to _onMediaStatusChanged(LoadedMedia)
     emit started();
 }
 
@@ -46,6 +66,9 @@ void Q_AudioPlayer::resume() {
 }
 
 void Q_AudioPlayer::stop() {
+    m_rangeTimer->stop();
+    m_rangeStartMs = -1.0;
+    m_rangeEndMs = -1.0;
     m_player->stop();
     emit stopped();
 }
@@ -91,9 +114,26 @@ void Q_AudioPlayer::_onMediaStatusChanged(QMediaPlayer::MediaStatus status) {
                 return "Unknown";
         }
     }(status));
+
+    if (status == QMediaPlayer::LoadedMedia && m_rangeStartMs >= 0.0) {
+        m_player->setPosition(static_cast<qint64>(m_rangeStartMs));
+        m_player->play();
+        auto durationMs = static_cast<int>(m_rangeEndMs - m_rangeStartMs);
+        m_rangeTimer->start(std::max(0, durationMs));
+        m_rangeStartMs = -1.0;  // consumed
+    }
+
     if (status == QMediaPlayer::EndOfMedia) {
+        m_rangeTimer->stop();
+        m_rangeEndMs = -1.0;
         emit finished();
     }
+}
+
+void Q_AudioPlayer::_onRangeTimerTimeout() {
+    m_rangeEndMs = -1.0;
+    m_player->stop();
+    emit finished();
 }
 
 void Q_AudioPlayer::_onErrorOccurred(QMediaPlayer::Error error, const QString& errorMessage) {

@@ -96,7 +96,12 @@ void Q_SessionPlaybackController::playSentence(int idx) {
         }
 
         if (success) {
-            m_audioPlayer->play(m_session.sentences[idx].localAudioPath);
+            const Sentence& s = m_session.sentences[idx];
+            if (s.audioRange) {
+                m_audioPlayer->play(s.localAudioPath, s.audioRange->startMs, s.audioRange->endMs);
+            } else {
+                m_audioPlayer->play(s.localAudioPath);
+            }
             emit sentencePlayStarted(idx);
             _prefetchNext(idx);
         } else {
