@@ -34,6 +34,18 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "package",
+      "inherits": "release",
+      "displayName": "Package",
+      "description": "Release build configured for DMG packaging (static whisper, .app bundle)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF",
+        "GGML_METAL_EMBED_LIBRARY": "ON",
+        "THOTH_MACOS_BUNDLE": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -44,6 +56,10 @@
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "package",
+      "configurePreset": "package"
     }
   ],
   "testPresets": [
