@@ -21,6 +21,7 @@ class Q_SessionPlaybackController : public QObject {
 
     // Session lifecycle
     void setSession(const Session& session);
+    void setContentProvider(IContentProvider* contentProvider);
     void reset();
 
     // Playback control

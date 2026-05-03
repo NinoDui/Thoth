@@ -14,12 +14,9 @@ AudioFileStreamSaver::AudioFileStreamSaver(LockFreeRingBuffer* buffer, const QAu
     : Q_AudioStreamConsumer(parent), m_dataSource(buffer), m_format(format) {
     if (rootDir) {
         m_rootDir = *rootDir;
-    } else {
-        m_rootDir = ConfigStore::instance().getCacheDir() / "record";
+        m_hasExplicitRootDir = true;
     }
-    if (!std::filesystem::exists(m_rootDir)) {
-        std::filesystem::create_directories(m_rootDir);
-    }
+    _resolveRootDir();
 
     m_ioBuffer = std::vector<char>(IO_BUFFER_SIZE);
 
@@ -30,11 +27,21 @@ AudioFileStreamSaver::AudioFileStreamSaver(LockFreeRingBuffer* buffer, const QAu
 
 AudioFileStreamSaver::~AudioFileStreamSaver() { _stop(); }
 
+void AudioFileStreamSaver::_resolveRootDir() {
+    if (!m_hasExplicitRootDir) {
+        m_rootDir = ConfigStore::instance().getCacheDir() / "record";
+    }
+    if (!std::filesystem::exists(m_rootDir)) {
+        std::filesystem::create_directories(m_rootDir);
+    }
+}
+
 void AudioFileStreamSaver::startSession(const std::string& sessionId) {
     if (m_file && m_file->isOpen()) {
         LOG_ERROR("Session already started");
         abortSession();
     }
+    _resolveRootDir();
     m_sessionId = QString::fromStdString(sessionId);
     auto path = m_rootDir / (m_sessionId.toStdString() + DEFAULT_FILE_EXTENSION.data());
     QString qPath;
@@ -99,7 +106,6 @@ void AudioFileStreamSaver::_stop() {
         }
         m_file.reset();
     }
-    m_ioBuffer.clear();
     m_totalBytes = 0;
     m_sessionId.clear();
 }

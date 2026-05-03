@@ -80,8 +80,32 @@ std::filesystem::path ConfigStore::getTempDir() const {
 }
 
 std::filesystem::path ConfigStore::getConfigDir() const { return m_configPath.parent_path(); }
-std::filesystem::path ConfigStore::getCacheDir() const { return getTempDir() / "cache"; }
-std::filesystem::path ConfigStore::getLogDir() const { return getTempDir() / "log"; }
+std::filesystem::path ConfigStore::getConfiguredPathNoLock(
+    const std::string& key, const std::filesystem::path& fallback) const {
+    if (!m_config.contains(key)) return fallback;
+
+    try {
+        const std::string configuredPath = m_config[key].get<std::string>();
+        if (!configuredPath.empty()) {
+            return fs::path(configuredPath);
+        }
+    } catch (const nlohmann::json::exception& e) {
+        spdlog::error("Failed to parse configured path [{}]: {}, rolling back to {}", key, e.what(),
+                      fallback.string());
+    }
+
+    return fallback;
+}
+
+std::filesystem::path ConfigStore::getCacheDir() const {
+    std::lock_guard<std::mutex> lock(m_configMutex);
+    return getConfiguredPathNoLock(thoth::config::KEY_CACHE_DIR, getTempDir() / "cache");
+}
+
+std::filesystem::path ConfigStore::getLogDir() const {
+    std::lock_guard<std::mutex> lock(m_configMutex);
+    return getConfiguredPathNoLock(thoth::config::KEY_LOG_DIR, getTempDir() / "log");
+}
 std::filesystem::path ConfigStore::getConfigFilePath() const { return m_configPath; }
 
 thoth::GoogleTTSConfig ConfigStore::getGoogleTTSConfig() const {
@@ -97,21 +121,9 @@ thoth::GoogleTTSConfig ConfigStore::getGoogleTTSConfig() const {
 
 thoth::LogConfig ConfigStore::getLogConfig() const {
     std::lock_guard<std::mutex> lock(m_configMutex);
+    const auto logDirPath =
+        getConfiguredPathNoLock(thoth::config::KEY_LOG_DIR, getTempDir() / "log");
 
-    // specify the default or user-defined log directory
-    std::filesystem::path logDirPath = getLogDir();
-    if (m_config.contains(thoth::config::KEY_LOG_DIR)) {
-        try {
-            std::string logDirStr = m_config[thoth::config::KEY_LOG_DIR].get<std::string>();
-            if (!logDirStr.empty()) {
-                logDirPath = fs::path(logDirStr);
-            }
-        } catch (const nlohmann::json::exception& e) {
-            spdlog::error(
-                "Failed to parse log directory: {}, rolling back to default log directory {}",
-                e.what(), logDirPath.string());
-        }
-    }
     return thoth::LogConfig{
         .level = m_config.value(thoth::config::KEY_LOG_LEVEL, thoth::config::DEFAULT_LOG_LEVEL),
         .pattern =

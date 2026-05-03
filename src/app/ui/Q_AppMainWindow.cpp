@@ -214,9 +214,22 @@ void Q_AppMainWindow::setupRecordingConnections() {
         int idx = m_lstContent->currentRow();
         if (idx < 0 || idx >= m_lstContent->count()) {
             LOG_WARN("Invalid index [{}], expected range [0, {})", idx, m_lstContent->count());
+            m_shadowingBar->reset();
             return;
         }
-        m_recordController->startRecording(m_currentSession.recordedSentences->at(idx).id);
+
+        auto& rs = m_currentSession.recordedSentences->at(idx);
+        if (m_recordController->startRecording(rs.id)) {
+            rs.localShadowingPath.clear();
+            rs.shadowingScore = 0.0;
+            rs.transcribedText.reset();
+            rs.scoringDetail.reset();
+
+            m_lstContent->item(idx)->setText(QString("[%1] %2").arg(idx + 1).arg(
+                QString::fromStdString(m_currentSession.sentences[idx].text)));
+        } else {
+            m_shadowingBar->reset();
+        }
     });
     connect(m_shadowingBar, &Q_ShadowingBar::sigStopRecording, this, [this]() {
         m_recordController->stopRecording();
@@ -337,6 +350,11 @@ void Q_AppMainWindow::onConfigChanged(const QString& key) {
         return;
     }
 
+    if (k == KEY_CACHE_DIR) {
+        recreateTTSEngine();
+        return;
+    }
+
     if (k == KEY_WHISPER_MODEL_PATH || k == KEY_WHISPER_MODEL_LANGUAGE) {
         reloadWhisperConfig();
         return;
@@ -371,14 +389,11 @@ void Q_AppMainWindow::recreateTTSEngine() {
     m_textContentProvider = std::make_unique<TextContentProvider>(std::move(engine), cacheDir);
 
     m_sessionPlaybackController->stop();
-    m_sessionPlaybackController = std::make_unique<Q_SessionPlaybackController>(
-        m_audioPlayer.get(), m_textContentProvider.get());
+    m_sessionPlaybackController->setContentProvider(m_textContentProvider.get());
 
     if (!m_currentSession.sentences.empty()) {
         m_sessionPlaybackController->setSession(m_currentSession);
     }
-
-    setupPlaybackConnections();
 
     LOG_INFO("TTS engine recreated live");
 }

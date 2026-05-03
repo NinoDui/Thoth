@@ -45,6 +45,11 @@ void Q_SessionPlaybackController::setSession(const Session& session) {
     m_currentIdx = DEFAULT_START_IDX;
 }
 
+void Q_SessionPlaybackController::setContentProvider(IContentProvider* contentProvider) {
+    stop();
+    m_contentProvider = contentProvider;
+}
+
 void Q_SessionPlaybackController::reset() {
     stop();
     m_currentIdx = DEFAULT_START_IDX;
