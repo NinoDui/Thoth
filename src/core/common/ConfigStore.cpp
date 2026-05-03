@@ -73,6 +73,11 @@ void ConfigStore::save() {
     file.close();
 }
 
+void ConfigStore::endBatchUpdate() {
+    save();
+    emit configChanged("settings/batch");
+}
+
 std::filesystem::path ConfigStore::getTempDir() const {
 #ifdef _WIN32
     return fs::temp_directory_path() / "Thoth" / launchTimestamp();

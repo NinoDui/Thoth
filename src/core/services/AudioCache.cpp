@@ -28,6 +28,27 @@ std::string AudioCache::_hash(const std::string& input) {
     return hash.toHex().toStdString();
 }
 
+std::string AudioCache::_extensionForEncoding(const std::string& cacheIdentity) {
+    auto pos = cacheIdentity.rfind('|');
+    if (pos == std::string::npos) {
+        return ".mp3";
+    }
+    std::string encoding = cacheIdentity.substr(pos + 1);
+    if (encoding == "MP3" || encoding == "mp3") {
+        return ".mp3";
+    }
+    if (encoding == "OGG_OPUS" || encoding == "ogg_opus") {
+        return ".ogg";
+    }
+    if (encoding == "LINEAR16" || encoding == "WAV" || encoding == "wav") {
+        return ".wav";
+    }
+    if (encoding == "MULAW" || encoding == "mulaw") {
+        return ".wav";
+    }
+    return ".mp3";
+}
+
 std::optional<fs::path> AudioCache::get(const std::string& sentence) const {
     fs::path dst = getFileName(sentence);
     if (fs::exists(dst) && fs::file_size(dst) > 0) {
@@ -50,7 +71,7 @@ fs::path AudioCache::getFileName(const std::string& sentence) const {
 fs::path AudioCache::getFileName(const std::string& sentence,
                                  const std::string& cacheIdentity) const {
     std::string key = sentence + "|" + cacheIdentity;
-    return m_cacheDir / (_hash(key) + ".mp3");
+    return m_cacheDir / (_hash(key) + _extensionForEncoding(cacheIdentity));
 }
 
 std::optional<fs::path> AudioCache::get(const std::string& sentence,

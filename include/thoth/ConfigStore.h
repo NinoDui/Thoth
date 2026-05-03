@@ -28,6 +28,19 @@ class ConfigStore : public QObject {
         emit configChanged(QString::fromStdString(key));
     }
 
+    // Sets a config value without triggering save() or configChanged signal.
+    // Use within beginBatchUpdate()/endBatchUpdate() to avoid repeated file I/O
+    // and signal cascades. Callers MUST invoke endBatchUpdate() after all sets.
+    template <typename T>
+    void setValueSilent(const std::string& key, const T& value) {
+        std::lock_guard<std::mutex> lock(m_configMutex);
+        m_config[key] = value;
+    }
+
+    // Saves current in-memory config to disk and emits a single batch notification.
+    // Should be called after a sequence of setValueSilent() calls.
+    void endBatchUpdate();
+
     template <typename T>
     std::optional<T> getValue(const std::string& key) const {
         std::lock_guard<std::mutex> lock(m_configMutex);

@@ -26,6 +26,40 @@ cmake --build build/debug
 ./build/debug/src/app/ThothApp
 ```
 
+## Google Cloud TTS Setup (first-time users)
+
+Thoth uses Google Cloud Text-to-Speech for generating reference audio. You need a GCP service account with the Text-to-Speech API enabled.
+
+### 1. Create a Google Cloud project
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) and create a new project (or select an existing one).
+2. Enable billing if prompted (TTS has [free tier](https://cloud.google.com/text-to-speech/pricing) — 1 million characters/month for standard voices).
+
+### 2. Enable the Text-to-Speech API
+
+Go to **APIs & Services → Library**, search for "Cloud Text-to-Speech API", and click **Enable**.
+
+### 3. Create a service account and download the key
+
+1. Go to **APIs & Services → Credentials**.
+2. Click **Create Credentials → Service Account**.
+3. Give it a name (e.g. `thoth-tts`) and click **Create and Continue**.
+4. For the role, select **Cloud Text-to-Speech User** (or **Basic → Viewer** for minimal permissions).
+5. Click **Done**, then click the service account email in the list.
+6. Go to the **Keys** tab and click **Add Key → Create New Key → JSON**.
+7. Save the downloaded `.json` file to a secure location on your machine.
+
+### 4. Point Thoth to the credential file
+
+- **Via Settings (recommended)**: Open Thoth, go to **File → Settings**, paste the path to the `.json` file in the **Credential** field, and click **OK**.
+- **Via environment variable**: `export GOOGLE_APPLICATION_CREDENTIALS=/path/to/your-key.json` before launching Thoth.
+
+On first launch without credentials, Thoth will prompt you to select the credential file automatically.
+
+### 5. Select a voice
+
+Open **File → Settings**, choose your language from the dropdown. Thoth will automatically load available voices from Google Cloud for that language. Pick a voice from the list and click **OK**.
+
 ## Build (cross-platform)
 
 | Platform | Instructions |

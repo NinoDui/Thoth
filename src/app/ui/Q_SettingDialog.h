@@ -53,4 +53,6 @@ class Q_SettingDialog : public QDialog {
     std::unique_ptr<Q_GCPVoiceLoader> m_voiceLoader;
     std::vector<thoth::GoogleVoiceInfo> m_loadedVoices;
     std::string m_loadedLanguage;
+    bool m_isInitialLoad = false;
+    std::string m_initialVoice;
 };

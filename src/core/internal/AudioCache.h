@@ -36,4 +36,5 @@ class AudioCache {
     std::unordered_map<int, std::filesystem::path> m_idxToPath;
 
     static std::string _hash(const std::string& input);
+    static std::string _extensionForEncoding(const std::string& cacheIdentity);
 };
