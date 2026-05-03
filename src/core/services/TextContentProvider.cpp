@@ -6,7 +6,8 @@
 
 TextContentProvider::TextContentProvider(std::shared_ptr<thoth::ITTSEngine> engine,
                                          const std::filesystem::path& cacheDir)
-    : m_ttsDownloader(std::make_shared<Q_TTSDownloader>(std::move(engine))),
+    : m_cacheIdentity(engine->cacheIdentity()),
+      m_ttsDownloader(std::make_shared<Q_TTSDownloader>(std::move(engine))),
       m_textParser(std::make_shared<TextParser>()) {
     m_audioCache = std::make_unique<AudioCache>(cacheDir);
 }
@@ -61,8 +62,7 @@ void TextContentProvider::loadFromText(std::string_view text,
 
 void TextContentProvider::prepareAudio(
     Sentence& sentence, std::function<void(bool success, const QString& errorMsg)> callback) {
-    // 1. Check if the audio is already cached
-    if (auto p = m_audioCache->get(sentence.text)) {
+    if (auto p = m_audioCache->get(sentence.text, m_cacheIdentity)) {
         sentence.localAudioPath = p->string();
         LOG_DEBUG("Audio for sentence [{}] is already cached at {}", sentence.id,
                   sentence.localAudioPath.string());
@@ -70,20 +70,19 @@ void TextContentProvider::prepareAudio(
         return;
     }
 
-    // 2. Check if the audio is being downloaded
     if (m_downloadingIdx.contains(sentence.id)) {
         LOG_DEBUG("Audio for sentence [{}] is already being downloaded", sentence.id);
         return;
     }
 
-    // 3. Download and save
     m_downloadingIdx.insert(sentence.id);
     try {
         m_ttsDownloader->download(
             sentence.text,
             [this, &sentence, callback](bool success, QByteArray data, QString errorMsg) {
                 if (success) {
-                    auto p = m_audioCache->saveAudio(std::stoi(sentence.id), sentence.text, data);
+                    auto p = m_audioCache->saveAudio(std::stoi(sentence.id), sentence.text, data,
+                                                     m_cacheIdentity);
                     sentence.localAudioPath = p.string();
                     LOG_DEBUG("Downloaded audio for sentence [{}] to {}", sentence.id,
                               sentence.localAudioPath.string());

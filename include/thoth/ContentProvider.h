@@ -63,6 +63,7 @@ class TextContentProvider : public IContentProvider {
 
     std::shared_ptr<AudioCache> m_audioCache;
     std::set<std::string> m_downloadingIdx;
+    std::string m_cacheIdentity;
 };
 
 template <>

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace thoth {
 
@@ -23,6 +24,13 @@ struct GoogleTTSConfig {
     std::string languageCode;
     std::string voiceName;
     std::string audioEncoding;
+};
+
+struct GoogleVoiceInfo {
+    std::string name;
+    std::vector<std::string> languageCodes;
+    std::string ssmlGender;
+    int naturalSampleRateHertz = 0;
 };
 
 struct LogConfig {

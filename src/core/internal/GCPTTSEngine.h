@@ -13,6 +13,7 @@ class GCPTTSEngine : public thoth::ITTSEngine {
 
     thoth::TTSAudioResult synthesize(const std::string& text) override;
     std::string engineName() const override;
+    std::string cacheIdentity() const override;
     bool isAvailable() const override;
 
    private:
