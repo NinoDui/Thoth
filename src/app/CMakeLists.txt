@@ -21,3 +21,16 @@ target_link_libraries(ThothApp PRIVATE ThothCore Qt6::Widgets)
 if(WIN32)
     # set_target_properties(ThothApp PROPERTIES WIN32_EXECUTABLE ON)
 endif()
+
+if(APPLE AND THOTH_MACOS_BUNDLE)
+    set_target_properties(
+        ThothApp
+        PROPERTIES MACOSX_BUNDLE ON
+                   MACOSX_BUNDLE_BUNDLE_NAME "Thoth"
+                   MACOSX_BUNDLE_GUI_IDENTIFIER "com.ninodui.thoth"
+                   MACOSX_BUNDLE_BUNDLE_VERSION "${THOTH_VERSION}"
+                   MACOSX_BUNDLE_SHORT_VERSION_STRING "${THOTH_VERSION}"
+                   MACOSX_BUNDLE_COPYRIGHT "Copyright © 2026 NinoDui"
+                   MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
+    )
+endif()

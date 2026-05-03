@@ -10,6 +10,17 @@ endif()
 
 project(Thoth LANGUAGES CXX)
 
+# App version — override via -DTHOTH_VERSION=x.y.z (set by scripts/package.sh)
+if(NOT DEFINED THOTH_VERSION)
+    file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" THOTH_VERSION LIMIT_COUNT 1)
+    if(NOT THOTH_VERSION)
+        set(THOTH_VERSION "0.0.0")
+    endif()
+endif()
+
+# Packaging flag: when ON, ThothApp builds as a macOS .app bundle
+option(THOTH_MACOS_BUNDLE "Build ThothApp as a macOS .app bundle" OFF)
+
 # Global Settings
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
