@@ -116,7 +116,7 @@ MODELS_SRC="${REPO_ROOT}/models"
 MODELS_DST="${STAGE_DIR}/${APP_BUNDLE}/Contents/Resources/models"
 if [[ -d "${MODELS_SRC}" ]] && [[ -n "$(ls -A "${MODELS_SRC}" 2>/dev/null)" ]]; then
     mkdir -p "${MODELS_DST}"
-    cp -R "${MODELS_SRC}/"* "${MODELS_DST}/"
+    cp -RL "${MODELS_SRC}/"* "${MODELS_DST}/"
     echo "  -> Copied models: $(ls "${MODELS_DST}")"
 else
     echo "  -> No models found in ${MODELS_SRC}, skipping."

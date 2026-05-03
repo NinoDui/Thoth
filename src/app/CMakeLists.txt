@@ -26,6 +26,7 @@ if(APPLE AND THOTH_MACOS_BUNDLE)
     set_target_properties(
         ThothApp
         PROPERTIES MACOSX_BUNDLE ON
+                   OUTPUT_NAME "Thoth"
                    MACOSX_BUNDLE_BUNDLE_NAME "Thoth"
                    MACOSX_BUNDLE_GUI_IDENTIFIER "com.ninodui.thoth"
                    MACOSX_BUNDLE_BUNDLE_VERSION "${THOTH_VERSION}"
