@@ -3,6 +3,8 @@
 Cross-platform (macOS / Windows) desktop app for foreign-language shadowing practice.
 Implemented in **C++20** with **Qt 6**.
 
+> I know the UI is far away from good ... but my bandwidth is quite occupied by daily research work ... so hopefully I will get it optimized someday ... later.
+
 ## Features
 
 - **Text input**: paste text or import `.txt` files → auto-segmented into sentences → TTS reference audio
