@@ -46,3 +46,9 @@ CLAUDE.md
 .opencode
 .claude
 .vscode
+
+# Development Dependencies
+vcpkg_installed
+models
+build
+dist
