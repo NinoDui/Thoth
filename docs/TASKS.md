@@ -142,13 +142,19 @@ Acceptance:
 #### P1.6 — Range Playback ✅
 
 - [x] `Q_AudioPlayer::play(path, startMs, endMs)` added.
-  - Sets source, defers play+seek to `LoadedMedia` status event.
-  - `QTimer` stops playback at `endMs` and emits `finished()`.
+  - Tracks pending range requests explicitly for source-audio sessions.
+  - Starts immediately when the same MP3/M4A/FLAC source is already loaded.
+  - Defers play+seek only when a new source still needs `LoadedMedia` / `BufferedMedia`.
+  - Stops playback at `endMs` via media `positionChanged`, with a timer fallback.
 - [x] `Q_SessionPlaybackController::playSentence()` checks `sentence.audioRange` and calls range play if set.
 - [x] Prefetch for audio-range sentences calls `prepareAudio()` which is a fast file-existence check (near-instant).
+- [x] Fixed MP3 same-source replay regression:
+  - First clicked sentence could play, then later random sentence double-clicks could do nothing because Qt did not emit another `LoadedMedia` for the already-loaded source.
+  - Root fix keeps text/TTS `play(path)` isolated while making `play(path, startMs, endMs)` independent of repeated media-status transitions.
 
 Acceptance:
 - Double-clicking an audio-imported sentence plays only that source-audio slice.
+- Double-clicking sentence A, then B/C in the same imported MP3 replays the selected slice every time.
 - Next / previous / loop / pause-and-repeat modes continue to work for audio sessions.
 - Existing text/TTS playback behavior is unchanged.
 
@@ -215,7 +221,7 @@ Acceptance:
 
 - [x] **Audio file import** (FR-003)
   - `Q_AppMainWindow::onImportFile` accepts `*.txt *.wav *.mp3 *.m4a *.flac` and dispatches to `AudioContentProvider` for audio files.
-  - WAV decode via existing `WAV::decode`; non-WAV returns a clear error (QAudioDecoder path pending).
+  - WAV decode via existing `WAV::decode`; MP3/M4A/FLAC decode via internal `Q_AudioDecoder` using Qt platform codecs.
 - [x] **Source-audio STT transcription** (FR-009, FR-017, FR-018, FR-020)
   - `Q_WhisperWorker::doTranscribeFile(QString)` added alongside existing `doTranscribe(RecordedSentence*)`.
   - `wparams.print_timestamps = true` in the new path.
@@ -223,6 +229,7 @@ Acceptance:
 - [x] **Audio-text alignment** (FR-021)
   - Whisper segments merged/split into `Sentence` objects with `audioRange` populated.
   - `Q_AudioPlayer::play(path, startMs, endMs)` added; `Q_SessionPlaybackController` uses it when `audioRange` is set.
+  - Same-source audio replay is robust for MP3 imports: later sentence selections no longer depend on Qt re-emitting `LoadedMedia`.
 - [ ] **Language detection** (FR-007)
   - Heuristic on imported text (Unicode block survey) + manual override via the language combo.
   - For audio: rely on Whisper's `lang_id` (set `wparams.language = "auto"` and read back the detected language), or skip until model size justifies it.
