@@ -3,6 +3,7 @@
 #include <QMediaPlayer>
 #include <QObject>
 #include <QTimer>
+#include <QUrl>
 #include <filesystem>
 #include <memory>
 
@@ -37,17 +38,26 @@ class Q_AudioPlayer : public QObject {
    private slots:
     void _onMediaStatusChanged(QMediaPlayer::MediaStatus status);
     void _onErrorOccurred(QMediaPlayer::Error error, const QString& errorMessage);
+    void _onPositionChanged(qint64 positionMs);
     void _onRangeTimerTimeout();
 
    private:
     static QString toQString(const std::filesystem::path& path);
     void _setupConnections();
+    void _clearRangeState();
+    bool _isRangePlayableStatus(QMediaPlayer::MediaStatus status) const;
+    void _startRangePlayback(double startMs, double endMs);
+    void _finishRangePlayback();
 
     std::unique_ptr<QMediaPlayer> m_player;
     std::unique_ptr<QAudioOutput> m_audioOutput;
     QTimer* m_rangeTimer;
 
-    // -1.0 when not in range-play mode; >= 0 when a pending seek is queued
-    double m_rangeStartMs = -1.0;
+    bool m_hasPendingRange = false;
+    QUrl m_pendingRangeUrl;
+    double m_pendingRangeStartMs = -1.0;
+    double m_pendingRangeEndMs = -1.0;
+
+    // -1.0 when not actively range-playing.
     double m_rangeEndMs = -1.0;
 };

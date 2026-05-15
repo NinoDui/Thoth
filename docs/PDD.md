@@ -166,7 +166,7 @@ Main Thread (GUI)
 | `Q_SessionPlaybackController` | Sentence playback loop. For text/TTS sentences: calls `IContentProvider::prepareAudio` → `Q_AudioPlayer::play(path)`. For audio-import sentences with `audioRange`: calls `play(path, startMs, endMs)`. Prefetches next 3 sentences. `suspendAutoAdvance()`, shadowing modes, `repeatRequested` signal for pause-and-repeat. |
 | `Q_RecordController` | Owns `Q_AudioCaptureProducer` + `LockFreeRingBuffer` + `AudioFileStreamSaver` (latter moved to dedicated `QThread`). Forwards mic data into ring buffer; emits `updateAmplitude(float)` for the visualizer; emits `recordingFinished(path)` on session finalize. Has a public DI constructor used by `TestRecordController`. |
 | `Q_ASRController` | Owns `Q_WhisperWorker` on dedicated `QThread`. `analyze(RecordedSentence*)` dispatches scoring path via `sigTranscribe`; `transcribeFile(path)` dispatches source-audio path via `sigTranscribeFile`. On `transcriptReady`, calls `m_scorer->scoreDetail(reference, hypothesis)`, stores `ScoringResult` in `RecordedSentence::scoringDetail`, emits `analysisReady`. On `transcriptSegmentsReady`, emits timestamped `TranscriptSegment` list for `AudioContentProvider`. |
-| `Q_WhisperWorker` (internal) | Lazy-loads whisper model on first transcription. **Scoring path** (`doTranscribe`): decodes recorded WAV → float PCM, runs `whisper_full` greedy, concatenates segment text. **Source-audio path** (`doTranscribeFile`): decodes source WAV (resamples to 16 kHz if needed), sets `print_timestamps = true`, emits `TranscriptSegment` list. `reloadModel()` frees the context for lazy reinit. Emits `busyChanged(bool)` for UI gating. |
+| `Q_WhisperWorker` (internal) | Lazy-loads whisper model on first transcription. **Scoring path** (`doTranscribe`): decodes recorded WAV → float PCM, runs `whisper_full` greedy, concatenates segment text. **Source-audio path** (`doTranscribeFile`): decodes WAV (resamples to 16 kHz if needed) or MP3/M4A/FLAC (via `Q_AudioDecoder::decodeToMono16kFloat`), sets `print_timestamps = true`, emits `TranscriptSegment` list. Exposes `progressChanged(int)` via `whisper_progress_callback` trampoline. `reloadModel()` frees the context for lazy reinit. Emits `busyChanged(bool)` for UI gating. |
 
 #### 4.2.3 `services/`
 
@@ -213,6 +213,7 @@ Main Thread (GUI)
 | `FileExtractor.h` | `FileExtractor` interface + factories |
 | `Q_AudioCapture.h` | `IAudioCaptureService` + `Q_AudioCaptureProducer` (Qt + interface multi-inheritance) |
 | `Q_AudioStorage.h` | `IStreamStorage`, `Q_AudioStreamConsumer` (abstract Qt), `AudioFileStreamSaver` |
+| `Q_AudioDecoder.h` | `Q_AudioDecoder : QObject` — synchronous `QAudioDecoder` wrapper for MP3/M4A/FLAC decode via `decodeToMono16kFloat()` |
 | `Q_WhisperWorker.h` | Whisper worker (`doTranscribe`, `reloadModel` slots) |
 | `Q_GCPTTSDownloader.h` | `Q_TTSDownloader` async wrapper (alias `Q_GCPTTSDownloader`) |
 | `AudioCache.h` | MD5-hashed audio cache |
@@ -450,6 +451,10 @@ cmake --build build/debug --target RunThothTest
 | FR-018 | Whisper.cpp integration (dual path) | ✅ Scoring + source-audio transcription paths |
 | FR-020 | Timestamp extraction | ✅ `wparams.print_timestamps = true` in source-audio path |
 | FR-021 | Audio-text alignment | ✅ Whisper segments merged/split into `Sentence` with `audioRange`; range playback via `Q_AudioPlayer::play(path, startMs, endMs)` |
+| — | Transcription progress reporting | ✅ `whisper_progress_callback` trampoline → `progressChanged(int)` signal chain through `Q_WhisperWorker` → `Q_ASRController` → status bar |
+| — | Concurrency import UX | ✅ Load buttons (LOAD FILE/TEXT TYPE/LOAD AUDIO) disabled during import; re-enabled on session ready or ASR error; `AudioContentProvider` callback not silently dropped on double-click |
+| — | Language auto-detection | ✅ `language == "auto"` passes `nullptr` to `whisper_full_params.language` for Whisper's built-in detection |
+| — | Sentence-ending punctuation | ✅ Extended `kEnders` to include `…` and `;` for podcast/lecture prose |
 | NFR-006 | Async / non-blocking GUI | ✅ QtConcurrent for TTS, `QThread` workers for IO and Whisper |
 | NFR-007 | Error handling | ✅ Exceptions + Qt error signals + `QMessageBox` for playback errors |
 | NFR-010 | Modular architecture | ✅ 15 public headers, internal/services/controllers/utils split |
@@ -464,8 +469,8 @@ cmake --build build/debug --target RunThothTest
 
 | PRD | Feature | Status / Note |
 |-----|---------|--------------|
-| FR-003 | Audio file import (non-WAV) | ⚠️ WAV works; MP3/M4A/FLAC returns clear error (QAudioDecoder path pending) |
-| FR-007 | Language detection | ❌ |
+| FR-003 | Audio file import (non-WAV) | ✅ WAV works; MP3/M4A/FLAC via `QAudioDecoder`-based `decodeToMono16kFloat()` |
+| FR-007 | Language detection | ⚠️ `"auto"` option passes `nullptr` to Whisper for built-in detection; no UI indicator of detected language yet |
 | FR-038 | Session summary | ❌ |
 | NFR-009 | Session persistence across restarts | ❌ Sessions live in memory only |
 | Config | Config change batching | ✅ `ConfigStore::setValueSilent` + `endBatchUpdate` — prevents signal cascades and segfaults during settings save |
@@ -478,7 +483,6 @@ cmake --build build/debug --target RunThothTest
 
 | Feature | Priority |
 |---------|----------|
-| Non-WAV audio decode (MP3/M4A/FLAC via QAudioDecoder) | Medium (FR-003) |
 | Session persistence / recovery | Medium (NFR-009) |
 | Session summary view | Medium (FR-038) |
 | Piper synthesis implementation | Medium |
@@ -520,14 +524,13 @@ cmake --build build/debug --target RunThothTest
 
 ## 10. Known Limitations
 
-1. **Non-WAV audio import pending** — `.wav` works via `WAV::decode`; `.mp3 /.m4a /.flac` return a clear error (Qt `QAudioDecoder` path not yet implemented).
-2. **Single Whisper context** — model switch requires `reloadModel()` (free + lazy reinit on next transcribe).
-3. **No session persistence** — close = lose. Recordings remain on disk under `<cacheDir>/record/` but aren't reattached.
-4. **Segmenter is English/Swedish-tuned** — `RegexSegmenter` splits on `.?!\n`; CJK punctuation is not handled.
-5. **No JP/KR token-level scoring** — WER tokenizes on whitespace, which is wrong for Japanese/Korean. (Low priority per current scope.)
-6. **Piper not functional** — `synthesize()` returns empty even when `isAvailable()` is true.
-7. **GCP is the de-facto TTS** — without a working Piper, network is required for new sentences (cached audio still plays offline).
-8. **No silence-detection auto-stop** — recording runs until the user clicks Stop. (Low priority per current scope.)
+1. **Single Whisper context** — model switch requires `reloadModel()` (free + lazy reinit on next transcribe).
+2. **No session persistence** — close = lose. Recordings remain on disk under `<cacheDir>/record/` but aren't reattached.
+3. **Segmenter is English/Swedish-tuned** — `RegexSegmenter` splits on `.?!\n`; CJK punctuation is not handled.
+4. **No JP/KR token-level scoring** — WER tokenizes on whitespace, which is wrong for Japanese/Korean. (Low priority per current scope.)
+5. **Piper not functional** — `synthesize()` returns empty even when `isAvailable()` is true.
+6. **GCP is the de-facto TTS** — without a working Piper, network is required for new sentences (cached audio still plays offline).
+7. **No silence-detection auto-stop** — recording runs until the user clicks Stop. (Low priority per current scope.)
 
 ---
 

@@ -7,6 +7,7 @@
 #include "thoth/ThothConfig.h"
 
 struct whisper_context;
+struct whisper_state;
 
 class Q_WhisperWorker : public QObject {
     Q_OBJECT
@@ -24,9 +25,12 @@ class Q_WhisperWorker : public QObject {
     void transcriptSegmentsReady(std::vector<TranscriptSegment> segments);
     void busyChanged(bool busy);
     void errorOccurred(const QString& message);
+    void progressChanged(int percent);
 
    private:
     bool ensureContext();
+    static void progressTrampoline(whisper_context* ctx, whisper_state* state, int progress,
+                                   void* user_data);
 
     whisper_context* m_ctx = nullptr;
     thoth::WhisperConfig m_config;

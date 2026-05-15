@@ -202,9 +202,13 @@ void Q_AppMainWindow::setupConnections() {
             m_lblStatus->setText("No text entered");
             return;
         }
+        m_btnLoadAudio->setEnabled(false);
+        m_btnLoadText->setEnabled(false);
         m_lblStatus->setText("Loading text...");
         m_textContentProvider->loadFromText(text.toStdString(), [this](Session session) {
             QMetaObject::invokeMethod(this, [this, session = std::move(session)]() {
+                m_btnLoadAudio->setEnabled(true);
+                m_btnLoadText->setEnabled(true);
                 m_currentSession = std::move(session);
                 m_currentSession.recordedSentences = std::vector<RecordedSentence>();
                 for (const auto& sentence : m_currentSession.sentences) {
@@ -408,7 +412,19 @@ void Q_AppMainWindow::setupASRConnections() {
             }
         });
     connect(m_asrController.get(), &Q_ASRController::errorOccurred, this,
-            [](const QString& msg) { LOG_ERROR("ASR error: {}", msg.toStdString()); });
+            [this](const QString& msg) {
+                LOG_ERROR("ASR error: {}", msg.toStdString());
+                m_btnLoadAudio->setEnabled(true);
+                m_btnLoadText->setEnabled(true);
+            });
+    connect(m_asrController.get(), &Q_ASRController::progressChanged, this,
+            [this](int p) { m_lblStatus->setText(QString("Transcribing… %1%").arg(p)); });
+    connect(m_asrController.get(), &Q_ASRController::busyChanged, this, [this](bool busy) {
+        if (!busy) {
+            m_lblStatus->setText("Loaded " + QString::number(m_currentSession.sentences.size()) +
+                                 " sentences");
+        }
+    });
 }
 
 void Q_AppMainWindow::onConfigChanged(const QString& key) {
@@ -498,6 +514,8 @@ void Q_AppMainWindow::onImportFile() {
 
     auto onSessionReady = [this](Session session) {
         QMetaObject::invokeMethod(this, [this, session = std::move(session)]() mutable {
+            m_btnLoadAudio->setEnabled(true);
+            m_btnLoadText->setEnabled(true);
             if (session.sentences.empty()) {
                 m_lblStatus->setText("Import failed — no sentences found");
                 return;
@@ -515,6 +533,9 @@ void Q_AppMainWindow::onImportFile() {
             LOG_INFO("Loaded {} sentences", m_currentSession.sentences.size());
         });
     };
+
+    m_btnLoadAudio->setEnabled(false);
+    m_btnLoadText->setEnabled(false);
 
     QString ext = QFileInfo(fileName).suffix().toLower();
     if (ext == "txt") {
@@ -537,10 +558,15 @@ void Q_AppMainWindow::onImportAudio() {
 
     LOG_INFO("Audio file selected: {}", fileName.toStdString());
 
+    m_btnLoadAudio->setEnabled(false);
+    m_btnLoadText->setEnabled(false);
+
     m_lblStatus->setText("Transcribing: " + QFileInfo(fileName).fileName() + " …");
     m_sessionPlaybackController->setContentProvider(m_audioContentProvider.get());
     m_audioContentProvider->load(fileName.toStdString(), [this](Session session) {
         QMetaObject::invokeMethod(this, [this, session = std::move(session)]() mutable {
+            m_btnLoadAudio->setEnabled(true);
+            m_btnLoadText->setEnabled(true);
             if (session.sentences.empty()) {
                 m_lblStatus->setText("Import failed — no sentences found");
                 return;

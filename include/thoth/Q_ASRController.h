@@ -26,6 +26,7 @@ class Q_ASRController : public QObject {
     void transcriptSegmentsReady(std::vector<TranscriptSegment> segments);
     void busyChanged(bool busy);
     void errorOccurred(const QString& message);
+    void progressChanged(int percent);
 
     // internal — bridges main thread to worker thread
     void sigTranscribe(RecordedSentence* rs);

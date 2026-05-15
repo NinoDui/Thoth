@@ -22,6 +22,7 @@ Q_ASRController::Q_ASRController(ISentenceScorer* scorer, const thoth::WhisperCo
             &Q_ASRController::transcriptSegmentsReady);
     connect(m_worker, &Q_WhisperWorker::busyChanged, this, &Q_ASRController::busyChanged);
     connect(m_worker, &Q_WhisperWorker::errorOccurred, this, &Q_ASRController::errorOccurred);
+    connect(m_worker, &Q_WhisperWorker::progressChanged, this, &Q_ASRController::progressChanged);
 
     m_workerThread->start();
 }

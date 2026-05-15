@@ -55,7 +55,7 @@ All P0 items implemented. Summary of key changes:
 - [x] **Playback settings persistence** — `KEY_PLAYBACK_RATE` and `KEY_PLAYBACK_MODE` restored on startup via `restorePlaybackSettings()`.
   - `src/app/ui/Q_AppMainWindow.cpp`
 
-## P1 — Audio-Input Gap Closure (Phase 2 per PDD §15) ✅ CORE COMPLETE (P1.1–P1.7 done; P1.8–P1.9 pending)
+## P1 — Audio-Input Gap Closure (Phase 2 per PDD §15) ✅ CORE COMPLETE (P1.1–P1.8 done; P1.9 pending)
 
 These add the audio-import workflow PRD requires (FR-003 family).
 
@@ -114,11 +114,11 @@ Acceptance:
 - Timestamped segments are emitted in source order with non-negative `startMs <= endMs`.
 - The existing recording-scoring path still passes current ASR/scoring tests.
 
-#### P1.4 — Decode / Resample Strategy (WAV complete; non-WAV pending)
+#### P1.4 — Decode / Resample Strategy ✅ COMPLETE
 
 - [x] WAV decode path: `WAV::decode` used in `Q_WhisperWorker::doTranscribeFile`.
 - [x] Resampling to 16 kHz mono: implemented `WAV::resample` with linear interpolation in `WAV.cpp`.
-- [ ] Non-WAV formats (MP3/M4A/FLAC): `QAudioDecoder`-based helper not yet implemented; unsupported files return a clear error message.
+- [x] Non-WAV formats (MP3/M4A/FLAC): `AudioDecoder::decodeToMono16kFloat()` via `QAudioDecoder` with synchronous `QEventLoop`.
 - [x] Decoder stays internal to `Q_WhisperWorker`, not exposed to `Q_AppMainWindow`.
 - [x] Clear error messages for unsupported codecs and decode failures.
 
@@ -163,12 +163,25 @@ Acceptance:
 - User cannot start playback before an audio session is ready.
 - Failed audio import leaves the previous session intact.
 
+#### P1.7b — Progress Reporting ✅
+
+- [x] `progressChanged(int)` signal added to `Q_WhisperWorker` and `Q_ASRController`.
+- [x] `whisper_progress_callback` wired via static trampoline in `doTranscribeFile`.
+- [x] Status bar updated with "Transcribing… N%" during import.
+- [x] Status bar resets to sentence count on `busyChanged(false)`.
+
+#### P1.7c — Concurrency UX ✅
+
+- [x] LOAD FILE, TEXT TYPE, and LOAD AUDIO buttons disabled during import.
+- [x] Buttons re-enabled in `onSessionReady` callback and on ASR `errorOccurred`.
+- [x] `AudioContentProvider` invokes `onReady(Session{})` in "already pending" branch (no silent callback drops).
+
 #### P1.8 — Language Detection
 
+- [x] When `m_config.language == "auto"`, `doTranscribeFile` passes `nullptr` to `wparams.language` for Whisper's built-in language detection.
 - [ ] Text input: add a small Unicode-block heuristic for initial language selection only; manual settings remain authoritative.
-- [ ] Audio input: default to configured Whisper language for P1.
 - [ ] Do not enable Whisper `"auto"` by default until the model/metadata path can report a reliable detected language to the UI.
-- [ ] Record the chosen language in logs for each import.
+- [x] Record the chosen language in logs for each import.
 
 Acceptance:
 - P1 does not silently change the user's configured language.

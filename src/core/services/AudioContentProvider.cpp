@@ -24,6 +24,7 @@ void AudioContentProvider::load(const std::filesystem::path& audioPath,
                                 std::function<void(Session)> onReady) {
     if (m_pendingCallback) {
         LOG_WARN("AudioContentProvider: load called while a transcription is already in progress");
+        onReady(Session{});
         return;
     }
 
@@ -103,7 +104,7 @@ void AudioContentProvider::clearPending() {
 // Segments that internally contain multiple sentences are split proportionally by char count.
 std::vector<Sentence> AudioContentProvider::buildSentences(
     const std::vector<TranscriptSegment>& segments, const std::filesystem::path& audioPath) {
-    static const std::string kEnders = ".?!。？！";
+    static const std::string kEnders = ".?!。？！…;";
 
     std::vector<Sentence> result;
     std::string accText;

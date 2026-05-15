@@ -21,6 +21,8 @@ void Q_AudioPlayer::_setupConnections() {
     connect(m_player.get(), &QMediaPlayer::mediaStatusChanged, this,
             &Q_AudioPlayer::_onMediaStatusChanged);
     connect(m_player.get(), &QMediaPlayer::errorOccurred, this, &Q_AudioPlayer::_onErrorOccurred);
+    connect(m_player.get(), &QMediaPlayer::positionChanged, this,
+            &Q_AudioPlayer::_onPositionChanged);
 }
 
 QString Q_AudioPlayer::toQString(const std::filesystem::path& path) {
@@ -32,9 +34,7 @@ QString Q_AudioPlayer::toQString(const std::filesystem::path& path) {
 }
 
 void Q_AudioPlayer::play(const std::filesystem::path& audioPath) {
-    m_rangeTimer->stop();
-    m_rangeStartMs = -1.0;
-    m_rangeEndMs = -1.0;
+    _clearRangeState();
     m_player->stop();
     m_player->setSource(QUrl::fromLocalFile(toQString(audioPath)));
     m_player->play();
@@ -42,12 +42,32 @@ void Q_AudioPlayer::play(const std::filesystem::path& audioPath) {
 }
 
 void Q_AudioPlayer::play(const std::filesystem::path& audioPath, double startMs, double endMs) {
-    m_rangeTimer->stop();
-    m_rangeStartMs = startMs;
-    m_rangeEndMs = endMs;
+    if (endMs <= startMs) {
+        emit errorOccurred(QString("Invalid playback range: %1-%2 ms").arg(startMs).arg(endMs));
+        return;
+    }
+
+    const QUrl targetUrl = QUrl::fromLocalFile(toQString(audioPath));
+    _clearRangeState();
     m_player->stop();
-    m_player->setSource(QUrl::fromLocalFile(toQString(audioPath)));
-    // Actual play() + seek deferred to _onMediaStatusChanged(LoadedMedia)
+
+    m_hasPendingRange = true;
+    m_pendingRangeUrl = targetUrl;
+    m_pendingRangeStartMs = startMs;
+    m_pendingRangeEndMs = endMs;
+
+    const auto status = m_player->mediaStatus();
+    if (m_hasPendingRange && m_player->source() == targetUrl &&
+        (_isRangePlayableStatus(status) || status == QMediaPlayer::EndOfMedia)) {
+        LOG_INFO("Range playback: same source already loaded, start immediately: {} [{}-{}]",
+                 targetUrl.toString().toStdString(), startMs, endMs);
+        _startRangePlayback(startMs, endMs);
+    } else if (m_hasPendingRange) {
+        LOG_INFO("Range playback: loading source: {} [{}-{}]", targetUrl.toString().toStdString(),
+                 startMs, endMs);
+        m_player->setSource(targetUrl);
+    }
+
     emit started();
 }
 
@@ -66,9 +86,7 @@ void Q_AudioPlayer::resume() {
 }
 
 void Q_AudioPlayer::stop() {
-    m_rangeTimer->stop();
-    m_rangeStartMs = -1.0;
-    m_rangeEndMs = -1.0;
+    _clearRangeState();
     m_player->stop();
     emit stopped();
 }
@@ -115,28 +133,73 @@ void Q_AudioPlayer::_onMediaStatusChanged(QMediaPlayer::MediaStatus status) {
         }
     }(status));
 
-    if (status == QMediaPlayer::LoadedMedia && m_rangeStartMs >= 0.0) {
-        m_player->setPosition(static_cast<qint64>(m_rangeStartMs));
-        m_player->play();
-        auto durationMs = static_cast<int>(m_rangeEndMs - m_rangeStartMs);
-        m_rangeTimer->start(std::max(0, durationMs));
-        m_rangeStartMs = -1.0;  // consumed
+    if (m_hasPendingRange && _isRangePlayableStatus(status) &&
+        m_player->source() == m_pendingRangeUrl) {
+        _startRangePlayback(m_pendingRangeStartMs, m_pendingRangeEndMs);
     }
 
     if (status == QMediaPlayer::EndOfMedia) {
-        m_rangeTimer->stop();
-        m_rangeEndMs = -1.0;
+        _clearRangeState();
         emit finished();
+    }
+
+    if (status == QMediaPlayer::InvalidMedia && m_hasPendingRange) {
+        _clearRangeState();
+        emit errorOccurred("Invalid media for range playback");
+    }
+}
+
+void Q_AudioPlayer::_onPositionChanged(qint64 positionMs) {
+    if (m_rangeEndMs >= 0.0 && static_cast<double>(positionMs) >= m_rangeEndMs) {
+        _finishRangePlayback();
     }
 }
 
 void Q_AudioPlayer::_onRangeTimerTimeout() {
-    m_rangeEndMs = -1.0;
-    m_player->stop();
-    emit finished();
+    if (m_rangeEndMs >= 0.0) {
+        _finishRangePlayback();
+    }
 }
 
 void Q_AudioPlayer::_onErrorOccurred(QMediaPlayer::Error error, const QString& errorMessage) {
+    (void)error;
     LOG_ERROR("Error occurred in audio player: {}", errorMessage.toStdString());
+    _clearRangeState();
     emit errorOccurred(errorMessage);
+}
+
+void Q_AudioPlayer::_clearRangeState() {
+    m_rangeTimer->stop();
+    m_hasPendingRange = false;
+    m_pendingRangeUrl = QUrl();
+    m_pendingRangeStartMs = -1.0;
+    m_pendingRangeEndMs = -1.0;
+    m_rangeEndMs = -1.0;
+}
+
+bool Q_AudioPlayer::_isRangePlayableStatus(QMediaPlayer::MediaStatus status) const {
+    return status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia ||
+           status == QMediaPlayer::BufferingMedia;
+}
+
+void Q_AudioPlayer::_startRangePlayback(double startMs, double endMs) {
+    m_hasPendingRange = false;
+    m_pendingRangeUrl = QUrl();
+    m_pendingRangeStartMs = -1.0;
+    m_pendingRangeEndMs = -1.0;
+    m_rangeEndMs = endMs;
+
+    LOG_DEBUG("Range playback: start [{}-{}]", startMs, endMs);
+    m_player->setPosition(static_cast<qint64>(startMs));
+    m_player->play();
+
+    const qreal playbackRate = std::max<qreal>(0.01, m_player->playbackRate());
+    const auto fallbackMs = static_cast<int>((endMs - startMs) / playbackRate) + 1000;
+    m_rangeTimer->start(std::max(0, fallbackMs));
+}
+
+void Q_AudioPlayer::_finishRangePlayback() {
+    _clearRangeState();
+    m_player->stop();
+    emit finished();
 }

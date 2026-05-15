@@ -6,6 +6,7 @@
 #include <filesystem>
 
 #include "internal/InternalEntity.h"
+#include "internal/Q_AudioDecoder.h"
 #include "thoth/Logger.h"
 
 Q_WhisperWorker::Q_WhisperWorker(const thoth::WhisperConfig& config, QObject* parent)
@@ -125,17 +126,22 @@ void Q_WhisperWorker::doTranscribeFile(const QString& audioPath) {
         }
         audioData = std::move(*wav.floatData);
     } else {
-        emit errorOccurred(
-            QString("Unsupported audio format '%1'. Only WAV is supported for transcription.")
-                .arg(QString::fromStdString(ext)));
-        emit busyChanged(false);
-        return;
+        try {
+            Q_AudioDecoder decoder;
+            audioData = decoder.decodeToMono16kFloat(pathStr);
+        } catch (const std::exception& e) {
+            emit errorOccurred(QString("Audio decode failed: %1").arg(e.what()));
+            emit busyChanged(false);
+            return;
+        }
     }
 
     whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-    wparams.language = m_config.language.c_str();
+    wparams.language = (m_config.language == "auto") ? nullptr : m_config.language.c_str();
     wparams.print_progress = false;
     wparams.print_timestamps = true;
+    wparams.progress_callback = &Q_WhisperWorker::progressTrampoline;
+    wparams.progress_callback_user_data = this;
 
     int ret = whisper_full(m_ctx, wparams, audioData.data(), static_cast<int>(audioData.size()));
     if (ret != 0) {
@@ -164,6 +170,12 @@ void Q_WhisperWorker::doTranscribeFile(const QString& audioPath) {
     LOG_DEBUG("Transcribed {} segments from file: {}", segments.size(), pathStr);
     emit transcriptSegmentsReady(std::move(segments));
     emit busyChanged(false);
+}
+
+void Q_WhisperWorker::progressTrampoline(whisper_context*, whisper_state*, int progress,
+                                         void* user_data) {
+    auto* self = static_cast<Q_WhisperWorker*>(user_data);
+    emit self->progressChanged(progress);
 }
 
 void Q_WhisperWorker::reloadModel(const thoth::WhisperConfig& config) {
