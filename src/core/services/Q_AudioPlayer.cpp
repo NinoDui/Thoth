@@ -59,12 +59,12 @@ void Q_AudioPlayer::play(const std::filesystem::path& audioPath, double startMs,
     const auto status = m_player->mediaStatus();
     if (m_hasPendingRange && m_player->source() == targetUrl &&
         (_isRangePlayableStatus(status) || status == QMediaPlayer::EndOfMedia)) {
-        LOG_INFO("Range playback: same source already loaded, start immediately: {} [{}-{}]",
-                 targetUrl.toString().toStdString(), startMs, endMs);
+        LOG_DEBUG("Range playback: same source already loaded, start immediately: {} [{}-{}]",
+                  targetUrl.toString().toStdString(), startMs, endMs);
         _startRangePlayback(startMs, endMs);
     } else if (m_hasPendingRange) {
-        LOG_INFO("Range playback: loading source: {} [{}-{}]", targetUrl.toString().toStdString(),
-                 startMs, endMs);
+        LOG_DEBUG("Range playback: loading source: {} [{}-{}]", targetUrl.toString().toStdString(),
+                  startMs, endMs);
         m_player->setSource(targetUrl);
     }
 
